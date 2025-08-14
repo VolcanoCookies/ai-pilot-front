@@ -1,0 +1,175 @@
+{{#> layouts/main title="User Tokens"}}
+
+<div class="container">
+    <section class="hero glass">
+        <h1>Tokens</h1>
+    </section>
+
+    <div class="dashboard-grid">
+        <!-- Create token panel -->
+        <section class="glass panel">
+            <div class="panel-header">
+                <div class="panel-title">
+                    <span class="glyph"></span>
+                    <span>Create New Token</span>
+                </div>
+            </div>
+            <div class="panel-body">
+                <form id="createTokenForm">
+                    <div class="form-grid">
+                        <div class="field">
+                            <label class="label" for="tokenName">Token Name</label>
+                            <input class="input" type="text" id="tokenName" name="name" required placeholder="e.g. CLI Access" autocomplete="off" data-form-type="other" data-protonpass-ignore="true" data-lpignore="true" data-1p-ignore />
+                        </div>
+                        <div class="field">
+                            <label class="label" for="expiresAt">Expires At (optional)</label>
+                            <input class="input" type="datetime-local" id="expiresAt" name="expires_at" />
+                            <div class="hint">Leave empty for tokens that never expire</div>
+                        </div>
+                        <div class="field full form-actions">
+                            <button type="submit" class="btn primary">Create Token</button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </section>
+
+        <!-- Tokens list panel -->
+        <section class="glass panel">
+            <div class="panel-header">
+                <div class="panel-title">
+                    <span class="glyph"></span>
+                    <span>Your Tokens</span>
+                </div>
+            </div>
+            <div class="panel-body panel-scroll">
+                {{#if tokens.0}}
+                                            {{#each tokens}}
+                                                <div class="row no-shift" style="align-items: flex-start; width: 100%;">
+                                        <div class="glyph purple"></div>
+                                        <div class="row-main" style="min-width: 0; width: 100%;">
+                                            <div class="row-title">{{this.name}}</div>
+                                            <div class="meta-inline">
+                                                <span>Created: {{this.created_at}}</span>
+                                                <span class="dot">•</span>
+                                                <span>
+                                                    Expires: 
+                                                    {{#if this.expires_at}}
+                                                        <span class="{{#if this.is_expired}}expires-expired{{/if}}">{{this.expires_at}}</span>
+                                                    {{else}}
+                                                        <span class="expires-never">Never</span>
+                                                    {{/if}}
+                                                </span>
+                                            </div>
+                                            <div class="spacer" style="height:8px;"></div>
+                                                            <div class="token-chip" data-token="{{this.token}}" title="Click to copy">
+                                                                <span class="token-chip-text">{{this.token}}</span>
+                                                                <div class="token-copied">Copied</div>
+                                                            </div>
+                                        </div>
+                                        <div class="row-spacer"></div>
+                                        <div class="row-actions" style="align-items:flex-start;">
+                                            <button class="btn danger" onclick="deleteToken('{{this.id}}', '{{this.name}}')">Delete</button>
+                                        </div>
+                                    </div>
+                                {{/each}}
+                        {{else}}
+                            <div class="card glass center no-hover">
+                        <div class="card-title">No tokens</div>
+                        <p class="muted">Create your first token to see it here.</p>
+                    </div>
+                {{/if}}
+            </div>
+        </section>
+    </div>
+</div>
+
+<script>
+        // Datetime: show native picker on click
+        const expiresAtInput = document.getElementById('expiresAt');
+        if (expiresAtInput && expiresAtInput.showPicker) {
+                expiresAtInput.addEventListener('click', () => expiresAtInput.showPicker());
+        }
+
+        // Create token form submission
+        document.getElementById('createTokenForm').addEventListener('submit', async function(e) {
+                e.preventDefault();
+                const formData = new FormData(this);
+                const expiresAtVal = formData.get('expires_at');
+                let expiresAt = null;
+                if (expiresAtVal) {
+                        expiresAt = Math.floor(new Date(expiresAtVal).getTime() / 1000);
+                }
+                const data = { name: formData.get('name'), expires_at: expiresAt };
+                try {
+                        const response = await fetch('/api/user_token', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify(data)
+                        });
+                        if (response.ok) {
+                                window.location.reload();
+                        } else {
+                                const error = await response.text();
+                                alert('Failed to create token: ' + error);
+                        }
+                } catch (error) {
+                        alert('Error creating token: ' + error.message);
+                }
+        });
+
+        // Delete token function
+        async function deleteToken(tokenId, tokenName) {
+                if (!confirm(`Are you sure you want to delete the token "${tokenName}"? This action cannot be undone.`)) {
+                        return;
+                }
+                try {
+                        const response = await fetch(`/api/user_token/${tokenId}`, { method: 'DELETE' });
+                        if (response.ok) {
+                                window.location.reload();
+                        } else {
+                                const error = await response.text();
+                                alert('Failed to delete token: ' + error);
+                        }
+                } catch (error) {
+                        alert('Error deleting token: ' + error.message);
+                }
+        }
+
+        // Copy token to clipboard functionality
+        async function copyToClipboard(text, tokenElement) {
+                try {
+                        await navigator.clipboard.writeText(text);
+                tokenElement.classList.add('copied');
+                setTimeout(() => tokenElement.classList.remove('copied'), 1600);
+                } catch (err) {
+                        const textArea = document.createElement('textarea');
+                        textArea.value = text;
+                        textArea.style.position = 'fixed';
+                        textArea.style.left = '-999999px';
+                        textArea.style.top = '-999999px';
+                        document.body.appendChild(textArea);
+                        textArea.focus();
+                        textArea.select();
+                        try {
+                                document.execCommand('copy');
+                                tokenElement.classList.add('copied');
+                                setTimeout(() => tokenElement.classList.remove('copied'), 1600);
+                        } catch (err) {
+                                console.error('Failed to copy token:', err);
+                                alert('Failed to copy token to clipboard');
+                        }
+                        document.body.removeChild(textArea);
+                }
+        }
+
+        // Click to copy on token chips
+        document.querySelectorAll('.token-chip').forEach(element => {
+                element.addEventListener('click', function() {
+                        const token = this.getAttribute('data-token');
+                        copyToClipboard(token, this);
+                });
+        });
+</script>
+
+{{/layouts/main}}

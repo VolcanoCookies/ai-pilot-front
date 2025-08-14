@@ -1,0 +1,43 @@
+<!-- Matches Panel (partial) -->
+<section class="glass panel">
+  <div class="panel-header">
+    <div class="panel-title">
+      <span class="glyph"></span>
+      <span>Recent Matches</span>
+    </div>
+  </div>
+  <div class="panel-body panel-scroll">
+    {{#if matches.0}}
+      {{#each matches}}
+        <div class="row">
+          <div class="glyph"></div>
+          <div class="row-main">
+            <div class="row-title match-teams-with-time">
+              <div class="match-teams">
+                <span class="team-a {{#if this.team_a.winner}}match-winner{{else}}match-loser{{/if}}">{{this.team_a.aip_name}} v{{this.team_a.version}}</span>
+                <span class="vs-text">vs</span>
+                <span class="team-b {{#if this.team_b.winner}}match-winner{{else}}match-loser{{/if}}">{{this.team_b.aip_name}} v{{this.team_b.version}}</span>
+              </div>
+              <div class="match-meta">
+                <span class="match-type">{{#if this.is_manual}}Manual{{else}}Auto{{/if}}</span>
+                <span class="match-timestamp">{{this.created_at}}</span>
+              </div>
+            </div>
+          </div>
+          <div class="row-actions" style="display: flex; align-items: center; gap: 8px;">
+            {{#if this.download_url}}
+              <a href="{{this.download_url}}" download class="material-symbols-rounded" title="Download match replay" style="font-size: 18px; color: var(--text-muted); text-decoration: none; transition: color 0.2s;">download</a>
+            {{else}}
+              <span class="material-symbols-rounded" title="Replay unavailable" style="font-size: 18px; color: rgba(166, 179, 194, 0.4); cursor: not-allowed;">file_download_off</span>
+            {{/if}}
+          </div>
+        </div>
+      {{/each}}
+    {{else}}
+      <div class="card glass center">
+        <div class="card-title">No recent matches</div>
+        <p class="muted">Run a match to see results here.</p>
+      </div>
+    {{/if}}
+  </div>
+</section>

@@ -1,0 +1,16 @@
+<nav class="navbar">
+  <div class="navbar-inner">
+    <a class="brand" href="/">
+      <span class="brand-badge"></span>
+      <span>AI Pilot</span>
+    </a>
+    <div class="nav-links">
+      <a href="/">Home</a>
+      <a href="/user_tokens">Tokens</a>
+      {{#if user}}
+        <img class="nav-avatar" src="{{user.avatar_url}}" alt="{{user.username}}" />
+      {{/if}}
+      <a href="/logout" class="btn ghost">Logout</a>
+    </div>
+  </div>
+</nav>

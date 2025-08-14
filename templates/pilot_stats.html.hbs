@@ -1,0 +1,251 @@
+{{#> layouts/main title=pilot.name}}
+
+<div class="container">
+  <!-- Pilot Header -->
+  <section class="stats-header">
+    <div class="stats-header-main">
+      <h1 class="stats-title">{{pilot.name}}</h1>
+      <div class="stats-meta">
+        <span class="pilot-creator">
+          by 
+          {{#if pilot.creator_avatar}}
+            <img src="{{pilot.creator_avatar}}" alt="{{pilot.creator}}" class="creator-avatar" />
+          {{/if}}
+          {{pilot.creator}}
+        </span>
+        <span class="pilot-separator">•</span>
+        <span class="pilot-version">v{{pilot.current_version}}</span>
+        {{#if pilot.is_own}}
+          <span class="pilot-separator">•</span>
+          <span class="badge success">Your Pilot</span>
+        {{/if}}
+      </div>
+    </div>
+    <div class="stats-header-actions">
+      {{#if pilot.is_own}}
+        <a href="/upload?name={{pilot.name}}" class="btn primary">Update Pilot</a>
+      {{/if}}
+      <a href="/" class="btn ghost">← Back</a>
+    </div>
+  </section>
+
+  <!-- Stats Grid -->
+  <div class="stats-grid">
+    <!-- Overall Stats -->
+    <section class="glass panel">
+      <div class="panel-header">
+        <div class="panel-title">
+          <span class="glyph"></span>
+          <span id="overall-stats-title">Overall Statistics</span>
+        </div>
+      </div>
+      <div class="panel-body">
+        <div class="stats-overview" id="overall-stats-container">
+          <div class="stat-item">
+            <div class="stat-value">{{overall_stats.total_matches}}</div>
+            <div class="stat-label">Total Matches</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-value success">{{overall_stats.wins}}</div>
+            <div class="stat-label">Wins</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-value danger">{{overall_stats.losses}}</div>
+            <div class="stat-label">Losses</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-value">{{overall_stats.win_rate}}%</div>
+            <div class="stat-label">Win Rate</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Opponents Stats -->
+    <section class="glass panel">
+      <div class="panel-header">
+        <div class="panel-title">
+          <span class="glyph purple"></span>
+          <span id="opponents-title">Opponents</span>
+        </div>
+      </div>
+      <div class="panel-body panel-scroll" id="opponents-container">
+        {{#if opponents.0}}
+          {{#each opponents}}
+            <div class="row row-clickable" onclick="window.location.href='/pilot/{{this.name}}'">
+              <div class="glyph other-pilot"></div>
+              <div class="row-main">
+                <div class="row-title">{{this.name}}</div>
+                <div class="row-sub">
+                  <span class="match-result">
+                    <span class="stat-wins">{{this.wins}}W</span> - <span class="stat-losses">{{this.losses}}L</span>
+                  </span>
+                  <span class="pilot-separator">•</span>
+                  <span>{{this.win_rate}}% win rate</span>
+                  <span class="pilot-separator">•</span>
+                  <span>{{this.total}} matches</span>
+                </div>
+              </div>
+            </div>
+          {{/each}}
+        {{else}}
+          <div class="card glass center">
+            <div class="card-title">No matches yet</div>
+            <p class="muted">This pilot hasn't fought any opponents.</p>
+          </div>
+        {{/if}}
+      </div>
+    </section>
+
+    <!-- Version Stats -->
+    <section class="glass panel">
+      <div class="panel-header">
+        <div class="panel-title">
+          <span class="glyph"></span>
+          <span>Performance by Version</span>
+        </div>
+      </div>
+      <div class="panel-body panel-scroll">
+        {{#if versions.0}}
+          {{#each versions}}
+            <div class="row version-row" data-version="{{this.version}}" onclick="selectVersion({{this.version}})">
+              <div class="trend-indicator {{#if this.trend}}{{this.trend}}{{else}}neutral{{/if}}">
+                {{#if (eq this.trend "up")}}↗{{else if (eq this.trend "down")}}↘{{else}}—{{/if}}
+              </div>
+              <div class="row-main">
+                <div class="row-title">Version {{this.version}}</div>
+                <div class="row-sub">
+                  <span class="match-result">
+                    <span class="stat-wins">{{this.wins}}W</span> - <span class="stat-losses">{{this.losses}}L</span>
+                  </span>
+                  <span class="pilot-separator">•</span>
+                  <span>{{this.win_rate}}% win rate</span>
+                  <span class="pilot-separator">•</span>
+                  <span>{{this.total}} matches</span>
+                </div>
+              </div>
+            </div>
+          {{/each}}
+        {{else}}
+          <div class="card glass center">
+            <div class="card-title">No version data</div>
+            <p class="muted">No matches found for this pilot.</p>
+          </div>
+        {{/if}}
+      </div>
+    </section>
+
+    <!-- Recent Matches -->
+    <section class="glass panel">
+      <div class="panel-header">
+        <div class="panel-title">
+          <span class="glyph"></span>
+          <span id="recent-matches-title">Recent Matches</span>
+        </div>
+      </div>
+      <div class="panel-body panel-scroll" id="recent-matches-container">
+        {{#if recent_matches.0}}
+          {{#each recent_matches}}
+            <div class="row no-hover">
+              <div class="match-result-icon {{#if this.won}}success{{else}}danger{{/if}}">
+                {{#if this.won}}W{{else}}L{{/if}}
+              </div>
+              <div class="row-main">
+                <div class="row-title">vs {{this.opponent}}</div>
+                <div class="row-sub">
+                  <span>v{{this.opponent_version}}</span>
+                  <span class="pilot-separator">•</span>
+                  <span>{{#if this.is_manual}}Manual{{else}}Auto{{/if}}</span>
+                  <span class="pilot-separator">•</span>
+                  <span>{{this.created_at}}</span>
+                </div>
+              </div>
+            </div>
+          {{/each}}
+        {{else}}
+          <div class="card glass center">
+            <div class="card-title">No recent matches</div>
+            <p class="muted">This pilot hasn't participated in any matches yet.</p>
+          </div>
+        {{/if}}
+      </div>
+    </section>
+  </div>
+</div>
+
+<script>
+let selectedVersion = null;
+const pilotName = '{{pilot.name}}';
+
+function selectVersion(version) {
+  // Remove selected class from all version rows
+  document.querySelectorAll('.version-row').forEach(row => {
+    row.classList.remove('selected');
+  });
+  
+  if (selectedVersion === version) {
+    // Deselect if clicking the same version
+    selectedVersion = null;
+    showAllStats();
+  } else {
+    // Select new version
+    selectedVersion = version;
+    document.querySelector(`[data-version="${version}"]`).classList.add('selected');
+    showVersionStats(version);
+  }
+}
+
+function showAllStats() {
+  // Update titles
+  document.getElementById('overall-stats-title').textContent = 'Overall Statistics';
+  document.getElementById('opponents-title').textContent = 'Opponents';
+  document.getElementById('recent-matches-title').textContent = 'Recent Matches';
+  
+  // Restore original content (reload page for simplicity)
+  location.reload();
+}
+
+async function showVersionStats(version) {
+  try {
+    // Update titles
+    document.getElementById('overall-stats-title').textContent = `Version ${version} Statistics`;
+    document.getElementById('opponents-title').textContent = `Version ${version} Opponents`;
+    document.getElementById('recent-matches-title').textContent = `Version ${version} Recent Matches`;
+    
+    // Show loading state
+    document.getElementById('overall-stats-container').innerHTML = '<div class="loading"><div class="spinner"></div>Loading...</div>';
+    document.getElementById('opponents-container').innerHTML = '<div class="loading"><div class="spinner"></div>Loading...</div>';
+    document.getElementById('recent-matches-container').innerHTML = '<div class="loading"><div class="spinner"></div>Loading...</div>';
+    
+    // Fetch version-specific data
+    const response = await fetch(`/pilot/${encodeURIComponent(pilotName)}/version/${version}`);
+    const html = await response.text();
+    
+    // Parse the response and extract the relevant parts
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(html, 'text/html');
+    
+    const overallStats = doc.querySelector('.stats-overview');
+    const opponents = doc.querySelector('#opponents-data');
+    const recentMatches = doc.querySelector('#recent-matches-data');
+    
+    if (overallStats) {
+      document.getElementById('overall-stats-container').innerHTML = overallStats.innerHTML;
+    }
+    if (opponents) {
+      document.getElementById('opponents-container').innerHTML = opponents.innerHTML;
+    }
+    if (recentMatches) {
+      document.getElementById('recent-matches-container').innerHTML = recentMatches.innerHTML;
+    }
+  } catch (error) {
+    console.error('Failed to load version stats:', error);
+    // Restore loading state with error message
+    document.getElementById('overall-stats-container').innerHTML = '<div class="alert error">Failed to load version statistics</div>';
+    document.getElementById('opponents-container').innerHTML = '<div class="alert error">Failed to load opponents data</div>';
+    document.getElementById('recent-matches-container').innerHTML = '<div class="alert error">Failed to load recent matches</div>';
+  }
+}
+</script>
+
+{{/layouts/main}}

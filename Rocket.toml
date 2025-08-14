@@ -1,0 +1,3 @@
+[default]
+limits.file = "25MiB"
+template_dir = "./templates"

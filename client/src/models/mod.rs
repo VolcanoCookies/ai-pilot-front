@@ -1,0 +1,14 @@
+pub mod ai_pilot;
+pub use self::ai_pilot::AiPilot;
+pub mod aip_version;
+pub use self::aip_version::AipVersion;
+pub mod error;
+pub use self::error::Error;
+pub mod match_result;
+pub use self::match_result::MatchResult;
+pub mod start_manual_fight_200_response;
+pub use self::start_manual_fight_200_response::StartManualFight200Response;
+pub mod team_info;
+pub use self::team_info::TeamInfo;
+pub mod upload_ai_pilot_200_response;
+pub use self::upload_ai_pilot_200_response::UploadAiPilot200Response;

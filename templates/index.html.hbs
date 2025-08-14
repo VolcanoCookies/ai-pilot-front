@@ -1,0 +1,60 @@
+{{#> layouts/main title="Home"}}
+
+<div class="container">
+  <section class="hero glass">
+    <h1>Welcome back{{#if user}} <span class="username">{{user.username}}</span>{{/if}}</h1>
+    <div class="hero-actions">
+  
+    </div>
+  </section>
+
+  <div class="dashboard-grid">
+    <!-- Pilots Panel (loaded lazily) -->
+    <div
+      id="home-pilots"
+      hx-get="/partials/home/pilots"
+      hx-trigger="intersect once"
+      hx-swap="outerHTML"
+      class="glass panel no-hover"
+      aria-busy="true"
+    >
+      <div class="panel-header">
+        <div class="panel-title">
+          <span class="glyph purple"></span>
+          <span>Your AI Pilots</span>
+        </div>
+      </div>
+      <div class="panel-body panel-scroll">
+        <div class="loading">
+          <div class="spinner" aria-hidden="true"></div>
+          <span>Loading pilots…</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Matches Panel (loaded lazily) -->
+    <div
+      id="home-matches"
+      hx-get="/partials/home/matches"
+      hx-trigger="intersect once"
+      hx-swap="outerHTML"
+      class="glass panel no-hover"
+      aria-busy="true"
+    >
+      <div class="panel-header">
+        <div class="panel-title">
+          <span class="glyph"></span>
+          <span>Recent Matches</span>
+        </div>
+      </div>
+      <div class="panel-body panel-scroll">
+        <div class="loading">
+          <div class="spinner" aria-hidden="true"></div>
+          <span>Loading matches…</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{{/layouts/main}}

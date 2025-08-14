@@ -1,0 +1,50 @@
+<!-- Pilots Panel (partial) -->
+<section class="glass panel">
+  <div class="panel-header">
+    <div class="panel-title">
+      <span class="glyph purple"></span>
+      <span>AI Pilots</span>
+    </div>
+    <div class="panel-actions">
+      <a href="/upload" class="icon-btn">+ Create new</a>
+    </div>
+  </div>
+  <div class="panel-body panel-scroll">
+    {{#if pilots.0}}
+      {{#each pilots}}
+        <div class="row row-clickable" onclick="window.location.href='/pilot/{{this.name}}'">
+          {{#if this.is_own}}
+            <div class="glyph own-pilot"></div>
+          {{else}}
+            <div class="glyph other-pilot"></div>
+          {{/if}}
+          <div class="row-main">
+            <div class="row-title">{{this.name}}</div>
+            <div class="row-sub">
+              {{#if this.is_own}}
+                <span class="pilot-creator own-creator">by {{this.creator}}</span>
+              {{else}}
+                <span class="pilot-creator other-creator">by {{this.creator}}</span>
+              {{/if}}
+              <span class="pilot-separator">•</span>
+              <span class="pilot-version">v{{this.current.version}}</span>
+            </div>
+          </div>
+          <div class="row-spacer"></div>
+          <div class="row-actions">
+            {{#if this.is_own}}
+              <a class="btn-icon primary" href="/upload?name={{this.name}}" onclick="event.stopPropagation();"><span class="material-symbols-rounded">upload</span></a>
+            {{/if}}
+          </div>
+        </div>
+      {{/each}}
+    {{else}}
+      <div class="card glass center">
+        <div class="card-title">No pilots yet</div>
+        <p class="muted">Upload your first AI Pilot to get started.</p>
+        <div class="spacer"></div>
+        <a href="/upload" class="btn primary">Upload AI Pilot</a>
+      </div>
+    {{/if}}
+  </div>
+</section>

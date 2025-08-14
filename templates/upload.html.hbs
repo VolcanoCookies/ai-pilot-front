@@ -1,0 +1,186 @@
+{{#> layouts/main title="Upload"}}
+
+<style>
+  /* Disabled button styling */
+  .btn.disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    background: #6b7280 !important;
+    border-color: #6b7280 !important;
+    color: #9ca3af !important;
+  }
+  .btn.disabled:hover {
+    background: #6b7280 !important;
+    border-color: #6b7280 !important;
+  }
+</style>
+
+<div class="container">
+  <div class="panel glass">
+    <div class="panel-header">
+      <div class="panel-title">
+        <span class="glyph"></span>
+        <span>Upload AI Pilot</span>
+      </div>
+    </div>
+
+    <div class="panel-body">
+      <div class="muted" style="margin:-2px 0 12px 0;">Name acts as ID — same name will update that pilot</div>
+      <form id="upload-form" class="form-grid" onsubmit="return false;">
+        <div class="field full">
+          <div style="display:flex; align-items:center; justify-content:space-between; gap:10px;">
+            <label class="label" for="name">Pilot Name</label>
+            <span id="mode-chip" class="badge">Create new</span>
+          </div>
+          <input id="name" name="name" class="input" type="text" placeholder="e.g. frostbyte" maxlength="32" autocomplete="off" data-form-type="other" data-protonpass-ignore="true" data-lpignore="true" data-1p-ignore required />
+          <div class="hint">3–32 letters/numbers/underscores</div>
+        </div>
+
+        <div class="field full">
+          <label class="label" for="zip">Pilot ZIP file</label>
+          <input id="zip" name="zip" class="input" type="file" accept=".zip" required />
+          <div class="hint">Max 25 MiB</div>
+        </div>
+
+        <div class="field full">
+          <div id="status" class="alert" style="display:none;"></div>
+        </div>
+
+        <div class="field full form-actions" style="gap:12px;">
+          <button id="submit-btn" class="btn primary" type="submit">Create</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  
+</div>
+
+<script>
+  (function() {
+    const myPilots = new Set(({{#if my_names}}[{{#each my_names}}"{{this}}"{{#unless @last}},{{/unless}}{{/each}}]{{else}}[]{{/if}}));
+    const otherPilots = new Set(({{#if other_names}}[{{#each other_names}}"{{this}}"{{#unless @last}},{{/unless}}{{/each}}]{{else}}[]{{/if}}));
+    const qName = {{#if preset_name}}"{{preset_name}}"{{else}}null{{/if}};
+    
+    // Check for 'name' query parameter in URL
+    const urlParams = new URLSearchParams(window.location.search);
+    const nameFromUrl = urlParams.get('name');
+    
+    const nameEl = document.getElementById('name');
+    const fileEl = document.getElementById('zip');
+    const chip = document.getElementById('mode-chip');
+    const submit = document.getElementById('submit-btn');
+    const statusEl = document.getElementById('status');
+
+    const nameRe = /^\w{3,32}$/;
+
+    function setChipMode(name) {
+      const isMyPilot = myPilots.has(name);
+      const isOtherPilot = otherPilots.has(name);
+      const isValidName = nameRe.test(name);
+      
+      // Reset all classes first
+      chip.classList.remove('success', 'warn', 'unknown');
+      submit.classList.remove('danger', 'success', 'disabled');
+      submit.disabled = false;
+      
+      if (!name || !isValidName) {
+        // Invalid or empty name
+        chip.textContent = 'Invalid name format';
+        chip.classList.add('warn');
+        submit.disabled = true;
+        submit.classList.add('disabled');
+        submit.textContent = 'Invalid Name';
+      } else if (isOtherPilot) {
+        // Name belongs to someone else - disable upload (red)
+        chip.textContent = 'Name already exists';
+        chip.classList.add('warn'); // red color
+        submit.disabled = true;
+        submit.classList.add('disabled'); // gray out the button
+        submit.textContent = 'Cannot Upload';
+      } else if (isMyPilot) {
+        // Updating my own pilot - orange/yellow chip, default button
+        chip.textContent = 'Update existing';
+        chip.classList.add('unknown'); // orange/yellow color
+        submit.textContent = 'Update';
+        submit.classList.remove('success'); // Remove green for updates
+      } else {
+        // Creating new pilot - green button
+        chip.textContent = 'Create new';
+        chip.classList.add('success');
+        submit.textContent = 'Create';
+        submit.classList.add('success'); // Green for new creations
+      }
+    }
+
+    function checkMode() {
+      const v = nameEl.value || '';
+      setChipMode(v);
+    }
+
+    function showStatus(kind, msg) {
+      statusEl.textContent = msg;
+      statusEl.className = 'alert';
+      if (kind === 'success') statusEl.classList.add('success');
+      else if (kind === 'error') statusEl.classList.add('error');
+      else statusEl.classList.add('info');
+      statusEl.style.display = 'block';
+    }
+
+    // Set the name field from backend preset_name or URL parameter
+    const initialName = qName || nameFromUrl;
+    if (initialName) {
+      nameEl.value = initialName;
+      checkMode();
+    } else {
+      setChipMode('');
+    }
+
+    nameEl.addEventListener('input', checkMode);
+
+    document.getElementById('upload-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const name = nameEl.value.trim();
+      if (!nameRe.test(name)) {
+        showStatus('error', 'Invalid name');
+        return;
+      }
+      
+      // Check if name belongs to someone else
+      if (otherPilots.has(name)) {
+        showStatus('error', 'Name already exists and belongs to another user');
+        return;
+      }
+      
+      const f = fileEl.files && fileEl.files[0];
+      if (!f) { showStatus('error', 'Select a ZIP file'); return; }
+      if (!f.name.toLowerCase().endsWith('.zip')) { showStatus('error', 'Must be a .zip'); return; }
+      if (f.size > 25 * 1024 * 1024) { showStatus('error', 'File too large (>25 MiB)'); return; }
+
+      submit.disabled = true;
+      submit.classList.add('loading');
+      showStatus('info', 'Uploading…');
+      try {
+        const buf = await f.arrayBuffer();
+        const res = await fetch(`/api/aipilot/upload?name=${encodeURIComponent(name)}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/octet-stream' },
+          body: buf,
+        });
+        if (!res.ok) {
+          const t = await res.text();
+          throw new Error(t || 'Upload failed');
+        }
+        showStatus('success', 'Upload complete');
+        setTimeout(() => { window.location.href = '/'; }, 650);
+      } catch (err) {
+        console.error(err);
+        showStatus('error', 'Upload failed');
+        submit.disabled = false;
+        submit.classList.remove('loading');
+      }
+    });
+  })();
+</script>
+
+{{/layouts/main}}

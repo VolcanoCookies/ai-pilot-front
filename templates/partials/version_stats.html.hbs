@@ -1,0 +1,72 @@
+<div class="stats-overview">
+  <div class="stat-item">
+    <div class="stat-value">{{overall_stats.total_matches}}</div>
+    <div class="stat-label">Total Matches</div>
+  </div>
+  <div class="stat-item">
+    <div class="stat-value success">{{overall_stats.wins}}</div>
+    <div class="stat-label">Wins</div>
+  </div>
+  <div class="stat-item">
+    <div class="stat-value danger">{{overall_stats.losses}}</div>
+    <div class="stat-label">Losses</div>
+  </div>
+  <div class="stat-item">
+    <div class="stat-value">{{overall_stats.win_rate}}%</div>
+    <div class="stat-label">Win Rate</div>
+  </div>
+</div>
+
+<div id="opponents-data">
+  {{#if opponents.0}}
+    {{#each opponents}}
+      <div class="row row-clickable" onclick="window.location.href='/pilot/{{this.name}}'">
+        <div class="glyph other-pilot"></div>
+        <div class="row-main">
+          <div class="row-title">{{this.name}}</div>
+          <div class="row-sub">
+            <span class="match-result">
+              <span class="stat-wins">{{this.wins}}W</span> - <span class="stat-losses">{{this.losses}}L</span>
+            </span>
+            <span class="pilot-separator">•</span>
+            <span>{{this.win_rate}}% win rate</span>
+            <span class="pilot-separator">•</span>
+            <span>{{this.total}} matches</span>
+          </div>
+        </div>
+      </div>
+    {{/each}}
+  {{else}}
+    <div class="card glass center">
+      <div class="card-title">No matches for this version</div>
+      <p class="muted">This version hasn't fought any opponents.</p>
+    </div>
+  {{/if}}
+</div>
+
+<div id="recent-matches-data">
+  {{#if recent_matches.0}}
+    {{#each recent_matches}}
+      <div class="row no-hover">
+        <div class="match-result-icon {{#if this.won}}success{{else}}danger{{/if}}">
+          {{#if this.won}}W{{else}}L{{/if}}
+        </div>
+        <div class="row-main">
+          <div class="row-title">vs {{this.opponent}}</div>
+          <div class="row-sub">
+            <span>v{{this.opponent_version}}</span>
+            <span class="pilot-separator">•</span>
+            <span>{{#if this.is_manual}}Manual{{else}}Auto{{/if}}</span>
+            <span class="pilot-separator">•</span>
+            <span>{{this.created_at}}</span>
+          </div>
+        </div>
+      </div>
+    {{/each}}
+  {{else}}
+    <div class="card glass center">
+      <div class="card-title">No recent matches for this version</div>
+      <p class="muted">This version hasn't participated in any matches yet.</p>
+    </div>
+  {{/if}}
+</div>
