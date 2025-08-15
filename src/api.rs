@@ -8,7 +8,9 @@ use rocket_okapi::openapi;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use crate::{AIP_CONFIG, SqliteClient, api_error::ApiErrors, cookie::ApiUser, model::UserToken};
+use crate::{
+    SqliteClient, api_client::ApiClient, api_error::ApiErrors, cookie::ApiUser, model::UserToken,
+};
 
 #[openapi]
 #[get("/healthz")]
@@ -31,16 +33,19 @@ struct GetAiPilotResponse {
 #[get("/aipilot?<name>")]
 async fn api_get_ai_pilots(
     _user: ApiUser,
-    name: Option<String>,
+    name: Option<&str>,
+    api_client: &State<ApiClient>,
 ) -> Result<Json<GetAiPilotResponse>, ApiErrors> {
-    let pilots = client::apis::default_api::get_ai_pilots(&AIP_CONFIG, name.as_deref(), None)
-        .await
-        .map_err(|e| {
-            log::error!("Failed to get AIPilots: {}", e);
-            ApiErrors::InternalError("Failed to get AIPilots".into())
-        })?;
-
-    let pilots = pilots.into_iter().collect::<Vec<_>>();
+    let pilots = if let Some(name) = name {
+        vec![
+            api_client
+                .get_pilot_by_name(name)
+                .await
+                .ok_or_else(|| ApiErrors::NotFound("Pilot not found".into()))?,
+        ]
+    } else {
+        api_client.get_pilots().await
+    };
 
     Ok(Json(GetAiPilotResponse { pilots }))
 }
@@ -51,21 +56,12 @@ struct GetMatchResponse {
 }
 
 #[openapi]
-#[get("/matches?<name>")]
+#[get("/matches")]
 async fn api_get_matches(
     _user: ApiUser,
-    name: Option<String>,
+    api_client: &State<ApiClient>,
 ) -> Result<Json<GetMatchResponse>, ApiErrors> {
-    let matches =
-        client::apis::default_api::get_match_results(&AIP_CONFIG, name.as_deref(), None, None)
-            .await
-            .map_err(|e| {
-                log::error!("Failed to get match results: {}", e);
-                ApiErrors::InternalError("Failed to get match results".into())
-            })?;
-
-    let matches = matches.into_iter().collect::<Vec<_>>();
-
+    let matches = api_client.get_matches(None, None).await;
     Ok(Json(GetMatchResponse { matches }))
 }
 
@@ -82,6 +78,7 @@ async fn api_upload_ai_pilot(
     user: ApiUser,
     name: String,
     data: Data<'_>,
+    api_client: &State<ApiClient>,
 ) -> Result<Json<PostAiPilotResponse>, ApiErrors> {
     if !NAME_REGEX.is_match(&name) {
         return Err(ApiErrors::BadRequest("Invalid name format".into()));
@@ -92,22 +89,11 @@ async fn api_upload_ai_pilot(
         ApiErrors::InternalError("Failed to read data".into())
     })?;
 
-    let res = client::apis::default_api::upload_ai_pilot(
-        &AIP_CONFIG,
-        &name,
-        data.value,
-        Some(&user.discord_id),
-    )
-    .await
-    .map_err(|e| {
-        log::error!("Failed to upload AIPilot: {}", e);
-        ApiErrors::InternalError("Failed to upload AIPilot".into())
-    })?;
+    let (upload_id, version) = api_client
+        .upload_ai_pilot(&name, &user.discord_id, data.value)
+        .await?;
 
-    Ok(Json(PostAiPilotResponse {
-        upload_id: res.upload_id,
-        version: res.version,
-    }))
+    Ok(Json(PostAiPilotResponse { upload_id, version }))
 }
 
 #[derive(Debug, Serialize, Deserialize, JsonSchema)]

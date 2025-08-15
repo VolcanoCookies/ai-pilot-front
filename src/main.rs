@@ -3,15 +3,14 @@ pub mod api_error;
 pub mod cookie;
 pub mod model;
 pub mod util;
+pub mod sso_client;
+pub mod api_client;
 
-use std::{env, str::FromStr, time::Duration};
+use std::{env, str::FromStr};
 
 use client::{
-    apis::configuration::{ApiKey, Configuration},
     models::match_result::Winner,
 };
-use lazy_static::lazy_static;
-use moka::future::Cache;
 use rocket::{
     fs::{relative, FileServer}, futures::future::join_all, http::{Cookie, CookieJar, Status}, response::Redirect, State
 };
@@ -20,13 +19,9 @@ use rocket_okapi::{
     rapidoc::{GeneralConfig, HideShowConfig, RapiDocConfig, make_rapidoc},
     settings::UrlObject,
 };
-use serde::{Deserialize, Serialize};
 
 use crate::{
-    api_error::ApiErrors,
-    cookie::ApiUser,
-    model::{User, UserToken},
-    util::{discord_avatar_url, format_date_time},
+    api_client::ApiClient, api_error::ApiErrors, cookie::ApiUser, model::{User, UserToken}, sso_client::SSOClient, util::{discord_avatar_url, format_date_time}
 };
 
 #[macro_use]
@@ -36,52 +31,9 @@ extern crate rocket_okapi;
 
 type SqliteClient = sqlx::Pool<sqlx::Sqlite>;
 
-lazy_static! {
-    static ref AIP_CONFIG: Configuration = Configuration {
-        base_path: env::var("AIP_API_BASE_URL").expect("AIP_API_BASE_URL must be set"),
-        user_agent: Some("api-front/1.0".to_string()),
-        api_key: Some(ApiKey {
-            prefix: None,
-            key: env::var("AIP_API_KEY").expect("AIP_API_KEY must be set")
-        }),
-        ..Default::default()
-    };
-    static ref PILOT_NAME_CACHE: Cache<uuid::Uuid, String> =
-        Cache::builder().max_capacity(2048).build();
-    static ref DISCORD_USER_CACHE: Cache<String, DiscordUserInfo> = Cache::builder()
-        .max_capacity(2048)
-        .time_to_live(Duration::from_secs(60 * 60 * 24))
-        .build();
-}
-
-#[derive(Deserialize, Clone)]
-struct DiscordUserInfo {
-    id: String,
-    username: String,
-    avatar: String,
-}
-
-async fn sso_fetch_discord_username(id: &str) -> Option<DiscordUserInfo> {
-    let client = reqwest::Client::default();
-    client
-        .get(format!("https://sso.isan.to/uinfo/{}", id))
-        .send()
-        .await
-        .ok()?
-        .json::<DiscordUserInfo>()
-        .await
-        .ok()
-}
-
-async fn get_discord_user(discord_id: String) -> Option<DiscordUserInfo> {
-    DISCORD_USER_CACHE
-        .optionally_get_with(discord_id.clone(), sso_fetch_discord_username(&discord_id))
-        .await
-}
-
 #[get("/")]
-async fn index_page(apiuser: ApiUser, client: &State<SqliteClient>) -> Template {
-    let user = User::get_by_id(apiuser.id, client).await.ok();
+async fn index_page(user: ApiUser, client: &State<SqliteClient>) -> Template {
+    let user = User::get_by_id(user.id, client).await.ok();
 
     Template::render(
         "index",
@@ -93,21 +45,12 @@ async fn index_page(apiuser: ApiUser, client: &State<SqliteClient>) -> Template 
 
 // Partials: Home Pilots
 #[get("/partials/home/pilots")]
-async fn partial_home_pilots(user: ApiUser) -> Result<Template, ApiErrors> {
+async fn partial_home_pilots(user: ApiUser,
+sso_client: &State<SSOClient>,
+api_client: &State<ApiClient>) -> Result<Template, ApiErrors> {
     // Fetch pilots owned by the user
-    let mut pilots = client::apis::default_api::get_ai_pilots(&AIP_CONFIG, None, None)
-        .await
-        .map_err(|e| {
-            log::error!("Failed to get AIPilots: {}", e);
-            ApiErrors::InternalError("Failed to get AIPilots".into())
-        })?;
-
-    join_all(
-        pilots
-            .iter()
-            .map(|p| PILOT_NAME_CACHE.insert(p.id, p.name.clone())),
-    )
-    .await;
+    let mut pilots = api_client.get_pilots()
+        .await;
 
     pilots.sort_by_key(|p| p.owner_id != user.discord_id.to_string());
 
@@ -116,7 +59,7 @@ async fn partial_home_pilots(user: ApiUser) -> Result<Template, ApiErrors> {
         let username = if is_own {
             "You".to_string()
         } else {
-            get_discord_user(p.owner_id.clone())
+            sso_client.get_user(&p.owner_id)
                 .await
                 .map(|u| u.username)
                 .unwrap_or_else(|| p.owner_id.clone())
@@ -140,26 +83,19 @@ async fn partial_home_pilots(user: ApiUser) -> Result<Template, ApiErrors> {
 
 // Partials: Home Matches (recent)
 #[get("/partials/home/matches")]
-async fn partial_home_matches() -> Result<Template, ApiErrors> {
-    let matches = client::apis::default_api::get_match_results(&AIP_CONFIG, None, None, None)
-        .await
-        .map_err(|e| {
-            log::error!("Failed to get match results: {}", e);
-            ApiErrors::InternalError("Failed to get match results".into())
-        })?;
+async fn partial_home_matches(
+    _user: ApiUser,
+    api_client: &State<ApiClient>
+) -> Result<Template, ApiErrors> {
+    let matches = api_client.get_matches(None, None).await;
+
 
     let matches_ctx: Vec<_> = join_all(matches.into_iter().map(async |m| {
-        let team_a_name = PILOT_NAME_CACHE
-            .get(&m.team_a.aip_id)
-            .await
-            .unwrap_or(m.team_a.aip_id.to_string());
-        let team_b_name = PILOT_NAME_CACHE
-            .get(&m.team_b.aip_id)
-            .await
-            .unwrap_or(m.team_b.aip_id.to_string());
+        let team_a_name = api_client.get_cached_pilot_name(&m.team_a.aip_id.to_string()).await.unwrap_or(m.team_a.aip_id.to_string());
+        let team_b_name = api_client.get_cached_pilot_name(&m.team_b.aip_id.to_string()).await.unwrap_or(m.team_b.aip_id.to_string());
 
         let download_url = if let Some(reply_id) = m.reply_id {
-            Some(format!("{}/replay?matchId={}", AIP_CONFIG.base_path, reply_id))
+            Some(format!("{}/replay?matchId={}", api_client.base_url(), reply_id))
         } else {
             None
         };
@@ -187,30 +123,10 @@ async fn partial_home_matches() -> Result<Template, ApiErrors> {
 }
 
 #[get("/login")]
-async fn login() -> Result<Redirect, ApiErrors> {
-    let base_url =
-        env::var("BASE_URL").map_err(|_| ApiErrors::InternalError("BASE_URL not set".into()))?;
-    let callback_url = format!("{}/login_callback", base_url);
-    Ok(Redirect::to(format!(
-        "https://sso.isan.to/login?service={}",
-        callback_url
-    )))
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-struct DiscordServerRole {
-    #[serde(rename = "discordId")]
-    discord_id: String,
-    roles: Vec<String>,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct GetUserDataResponse {
-    id: String,
-    username: String,
-    avatar: String,
-    roles: Vec<DiscordServerRole>,
+async fn login(
+    sso_client: &State<SSOClient>,
+) -> Result<Redirect, ApiErrors> {
+    Ok(Redirect::to(sso_client.get_redirect_url()))
 }
 
 #[get("/login_callback?<code>")]
@@ -218,22 +134,13 @@ async fn login_callback(
     code: &str,
     cookies: &CookieJar<'_>,
     client: &State<SqliteClient>,
+    sso_client: &State<SSOClient>,
 ) -> Result<Redirect, ApiErrors> {
-    let res = reqwest::Client::new()
-        .get(format!("https://sso.isan.to/getuser/{}", code))
-        .send()
-        .await
-        .map_err(|e| {
-            log::error!("Failed to fetch login callback: {}", e);
-            ApiErrors::InternalError("Failed to fetch login callback".into())
-        })?;
+    let Some(user) = sso_client.get_user_oauth(code).await else {
+        return Err(ApiErrors::BadRequest("Invalid OAuth code".into()));
+    };
 
-    let data = res.json::<GetUserDataResponse>().await.map_err(|e| {
-        log::error!("Failed to parse login callback response: {}", e);
-        ApiErrors::InternalError("Failed to parse login callback response".into())
-    })?;
-
-    let user = User::upsert_by_discord_id(&data.id, &data.username, &data.avatar, &**client)
+    let user = User::upsert_by_discord_id(&user.id, &user.username, &user.avatar, &**client)
         .await
         .map_err(|e| {
             log::error!("Failed to upsert user: {}", e);
@@ -295,17 +202,14 @@ async fn user_tokens_page(
 #[get("/upload?<name>")]
 async fn upload_page(
     user: ApiUser,
-    client: &State<SqliteClient>,
     name: Option<String>,
+    client: &State<SqliteClient>,
+    api_client: &State<ApiClient>,
 ) -> Result<Template, ApiErrors> {
     let u = User::get_by_id(user.id, client).await.ok();
 
-    let pilots = client::apis::default_api::get_ai_pilots(&AIP_CONFIG, None, None)
-        .await
-        .map_err(|e| {
-            log::error!("Failed to get AIPilots: {}", e);
-            ApiErrors::InternalError("Failed to get AIPilots".into())
-        })?;
+    let pilots = api_client.get_pilots()
+        .await;
 
     let mut my_names = Vec::new();
     let mut other_names = Vec::new();
@@ -334,33 +238,14 @@ async fn pilot_stats_page(
     user: ApiUser,
     pilot_name: &str,
     client: &State<SqliteClient>,
+    sso_client: &State<SSOClient>,
+    api_client: &State<ApiClient>,
 ) -> Result<Template, ApiErrors> {
     let u = User::get_by_id(user.id, client).await.ok();
 
-    // Get all pilots to find the specific one by name
-    let pilots = client::apis::default_api::get_ai_pilots(&AIP_CONFIG, None, None)
-        .await
-        .map_err(|e| {
-            log::error!("Failed to get AI Pilots: {}", e);
-            ApiErrors::InternalError("Failed to get pilots".into())
-        })?;
-
-    let pilot = pilots.into_iter()
-        .find(|p| p.name == pilot_name)
+    let pilot = api_client.get_pilot_by_name(pilot_name).await
         .ok_or_else(|| ApiErrors::NotFound("Pilot not found".into()))?;
-
-    // Get all matches (we'll filter client-side for now)
-    let all_matches = client::apis::default_api::get_match_results(&AIP_CONFIG, None, None, None)
-        .await
-        .map_err(|e| {
-            log::error!("Failed to get matches: {}", e);
-            ApiErrors::InternalError("Failed to get matches".into())
-        })?;
-
-    // Filter matches that involve this pilot
-    let matches: Vec<_> = all_matches.into_iter()
-        .filter(|m| m.team_a.aip_id == pilot.id || m.team_b.aip_id == pilot.id)
-        .collect();
+    let matches = api_client.get_matches(Some(pilot.id.to_string().as_str()), None).await;
 
     // Calculate overall stats
     let total_matches = matches.len();
@@ -380,8 +265,7 @@ async fn pilot_stats_page(
             (m.team_a.aip_id, m.winner == Winner::TeamB)
         };
         
-        let opponent_name = PILOT_NAME_CACHE
-            .get(&opponent_id)
+        let opponent_name = api_client.get_cached_pilot_name(&opponent_id.to_string())
             .await
             .unwrap_or(opponent_id.to_string());
         
@@ -467,9 +351,8 @@ async fn pilot_stats_page(
         } else {
             (m.team_a.aip_id, m.team_a.version, m.winner == Winner::TeamB)
         };
-        
-        let opponent_name = PILOT_NAME_CACHE
-            .get(&opponent_id)
+
+        let opponent_name = api_client.get_cached_pilot_name(&opponent_id.to_string())
             .await
             .unwrap_or(opponent_id.to_string());
         
@@ -488,7 +371,7 @@ async fn pilot_stats_page(
     let is_own_pilot = pilot_owner_id == user.discord_id.to_string();
 
     // Get creator info from Discord cache
-    let creator_info = get_discord_user(pilot_owner_id.clone()).await;
+    let creator_info = sso_client.get_user(&pilot_owner_id).await;
     let creator_name = creator_info
         .as_ref()
         .map(|info| info.username.clone())
@@ -531,26 +414,14 @@ async fn pilot_version_stats(
     _user: ApiUser,
     pilot_name: &str,
     version: i32,
+    api_client: &State<ApiClient>,
 ) -> Result<Template, ApiErrors> {
     // Get all pilots to find the specific one by name
-    let pilots = client::apis::default_api::get_ai_pilots(&AIP_CONFIG, None, None)
-        .await
-        .map_err(|e| {
-            log::error!("Failed to get AI Pilots: {}", e);
-            ApiErrors::InternalError("Failed to get pilots".into())
-        })?;
-
-    let pilot = pilots.into_iter()
-        .find(|p| p.name == pilot_name)
+    let pilot = api_client.get_pilot_by_name(pilot_name).await
         .ok_or_else(|| ApiErrors::NotFound("Pilot not found".into()))?;
 
     // Get all matches and filter for this pilot and version
-    let all_matches = client::apis::default_api::get_match_results(&AIP_CONFIG, None, None, None)
-        .await
-        .map_err(|e| {
-            log::error!("Failed to get matches: {}", e);
-            ApiErrors::InternalError("Failed to get matches".into())
-        })?;
+    let all_matches = api_client.get_matches(Some(pilot.id.to_string().as_str()), Some(pilot.current.version)).await;
 
     let version_matches: Vec<_> = all_matches.into_iter()
         .filter(|m| {
@@ -567,12 +438,8 @@ async fn pilot_version_stats(
         } else {
             (m.team_a.aip_id, m.winner == Winner::TeamB)
         };
-        
-        let opponent_name = PILOT_NAME_CACHE
-            .get(&opponent_id)
-            .await
-            .unwrap_or(opponent_id.to_string());
-        
+        let opponent_name = api_client.get_cached_pilot_name(&opponent_id.to_string()).await;
+
         let stats = opponent_stats.entry(opponent_name).or_insert((0, 0, 0));
         if won {
             stats.0 += 1;
@@ -606,12 +473,9 @@ async fn pilot_version_stats(
         } else {
             (m.team_a.aip_id, m.team_a.version, m.winner == Winner::TeamB)
         };
-        
-        let opponent_name = PILOT_NAME_CACHE
-            .get(&opponent_id)
-            .await
-            .unwrap_or(opponent_id.to_string());
-        
+
+        let opponent_name = api_client.get_cached_pilot_name(&opponent_id.to_string()).await;
+
         context! {
             opponent: opponent_name,
             opponent_version: opponent_version,
@@ -699,8 +563,13 @@ async fn rocket() -> _ {
         .await
         .expect("Failed to run migrations");
 
+    let sso_client = SSOClient::new();
+    let api_client = ApiClient::new();
+
     rocket::build()
         .manage(client)
+        .manage(sso_client)
+        .manage(api_client)
         .mount("/api", api::routes())
         .mount("/static", FileServer::from(relative!("public")))
         .mount(
