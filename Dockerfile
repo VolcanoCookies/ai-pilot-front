@@ -13,4 +13,6 @@ COPY ./templates /app/templates
 COPY ./public /app/public
 COPY ./Rocket.toml /app/Rocket.toml
 
+LABEL org.opencontainers.image.source=https://github.com/VolcanoCookies/ai-pilot-front
+
 CMD ["aip-front"]
