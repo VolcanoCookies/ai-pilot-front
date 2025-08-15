@@ -5,7 +5,7 @@ COPY . .
 RUN cargo build --release
 
 # ---
-FROM rust:1.89.0-alpine3.22
+FROM rust:1.89.0-slim-trixie
 WORKDIR /app
 
 COPY --from=builder /app/target/release/aip-front /app
@@ -15,4 +15,4 @@ COPY ./Rocket.toml /app/Rocket.toml
 
 LABEL org.opencontainers.image.source https://github.com/VolcanoCookies/ai-pilot-front
 
-CMD ["aip-front"]
+CMD ["/app/aip-front"]
