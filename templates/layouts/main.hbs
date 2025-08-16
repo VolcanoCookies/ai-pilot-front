@@ -91,6 +91,27 @@
             color: #e57373; /* Pastel red */
         }
         
+        /* Build info styling */
+        .build-info {
+            position: fixed;
+            bottom: 10px;
+            left: 10px;
+            font-size: 10px;
+            color: rgba(166, 179, 194, 0.5);
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+            background: rgba(0, 0, 0, 0.1);
+            padding: 2px 6px;
+            border-radius: 3px;
+            backdrop-filter: blur(2px);
+            pointer-events: none;
+            z-index: 1000;
+        }
+        
+        .build-info .build-hash::after {
+            content: " • ";
+            opacity: 0.7;
+        }
+        
         {{#if pageStyles}}
         {{{pageStyles}}}
         {{/if}}
@@ -239,6 +260,14 @@
     
     {{#if additionalScripts}}
     {{{additionalScripts}}}
+    {{/if}}
+
+    <!-- Build Info -->
+    {{#if build_info}}
+    <div class="build-info">
+        <span class="build-hash">{{build_info.git_hash}}</span>
+        <span class="build-timestamp">{{build_info.build_date}}</span>
+    </div>
     {{/if}}
 
 </body>
