@@ -16,6 +16,8 @@ use crate::{
 pub struct ApiUser {
     pub id: UserId,
     pub discord_id: String,
+    pub username: String,
+    pub avatar: String,
 }
 
 #[async_trait]
@@ -35,6 +37,8 @@ impl<'r> FromRequest<'r> for ApiUser {
                     return Outcome::Success(ApiUser {
                         id: user.id,
                         discord_id: user.discord_id,
+                        username: user.username,
+                        avatar: user.avatar_url,
                     });
                 }
             }

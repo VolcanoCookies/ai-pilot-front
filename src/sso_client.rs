@@ -4,8 +4,6 @@ use log::error;
 use moka::future::Cache;
 use serde::Deserialize;
 
-use crate::model::User;
-
 #[derive(Debug, Clone, Deserialize)]
 pub struct DiscordUserInfo {
     pub id: String,
@@ -52,11 +50,10 @@ impl SSOClient {
             .ok()
     }
 
-    pub fn get_redirect_url(&self) -> String {
-        format!(
-            "https://sso.isan.to/login?service={}/login_callback",
-            self.own_base_url
-        )
+    pub fn get_redirect_url(&self, next: Option<&str>) -> String {
+        let next = next.unwrap_or("/");
+        let callback = format!("{}/login_callback{}", self.own_base_url, next);
+        format!("https://sso.isan.to/login?service={}", callback)
     }
 
     pub async fn get_user_oauth(&self, code: &str) -> Option<DiscordUserInfo> {

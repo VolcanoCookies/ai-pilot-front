@@ -1,3 +1,5 @@
+use serde::Serialize;
+
 pub fn format_date_relative(date: &chrono::DateTime<chrono::Utc>) -> String {
     let now = chrono::Utc::now();
     let duration = now.signed_duration_since(*date);
@@ -33,5 +35,41 @@ pub fn format_bytes(bytes: i64) -> String {
         format!("{:.2} MB", bytes as f64 / (1024.0 * 1024.0))
     } else {
         format!("{:.2} GB", bytes as f64 / (1024.0 * 1024.0 * 1024.0))
+    }
+}
+
+pub const GIT_COMMIT_HASH: &str = {
+    let commit = option_env!("DRONE_COMMIT");
+    if let Some(commit) = commit {
+        commit
+    } else {
+        "unknown"
+    }
+};
+
+const fn get_git_build_date() -> Option<chrono::DateTime<chrono::Utc>> {
+    let build_date = option_env!("DRONE_BUILD_START");
+    let Some(str) = build_date else {
+        return None;
+    };
+    let Ok(secs) = i64::from_str_radix(str, 10) else {
+        return None;
+    };
+    chrono::DateTime::from_timestamp(secs, 0)
+}
+pub const GIT_BUILD_DATE: Option<chrono::DateTime<chrono::Utc>> = get_git_build_date();
+
+#[derive(Debug, Clone, Serialize)]
+pub struct BuildInfo {
+    pub git_hash: &'static str,
+    pub build_date: String,
+}
+
+pub fn build_info_ctx() -> BuildInfo {
+    BuildInfo {
+        git_hash: GIT_COMMIT_HASH,
+        build_date: GIT_BUILD_DATE
+            .as_ref()
+            .map_or("unknown".to_string(), format_date_time),
     }
 }

@@ -8,9 +8,13 @@
       <a href="/">Home</a>
       <a href="/user_tokens">Tokens</a>
       {{#if user}}
-        <img class="nav-avatar" src="{{user.avatar_url}}" alt="{{user.username}}" />
+        <img class="nav-avatar" src="https://cdn.discordapp.com/avatars/{{user.discord_id}}/{{user.avatar}}.png" alt="{{user.username}}" />
       {{/if}}
-      <a href="/logout" class="btn ghost">Logout</a>
+      {{#if user}}
+        <a href="/logout" class="btn ghost">Logout</a>
+      {{else}}
+        <a href="/login" class="btn ghost">Login</a>
+      {{/if}}
     </div>
   </div>
 </nav>

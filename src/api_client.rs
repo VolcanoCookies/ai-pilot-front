@@ -8,14 +8,12 @@ use moka::future::Cache;
 use rocket::futures::future::join_all;
 use uuid::Uuid;
 pub struct ApiClient {
-    client: reqwest::Client,
     configuration: Configuration,
     pilot_name_cache: Cache<String, String>,
 }
 
 impl ApiClient {
     pub fn new() -> Self {
-        let client = reqwest::Client::new();
         let configuration = Configuration {
             base_path: env::var("AIP_API_BASE_URL").expect("AIP_API_BASE_URL must be set"),
             user_agent: Some("api-front/1.0".to_string()),
@@ -29,7 +27,6 @@ impl ApiClient {
         let pilot_name_cache = Cache::builder().max_capacity(2048).build();
 
         ApiClient {
-            client,
             configuration,
             pilot_name_cache,
         }
