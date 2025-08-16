@@ -1,0 +1,34 @@
+{{#if pilot}}
+  <!-- Selected pilot display -->
+  <div id="pilot-{{pilot_letter}}-selected" class="pilot-selected">
+    <div class="selected-pilot">
+      <div class="glyph {{#if pilot.is_own}}own-pilot{{else}}other-pilot{{/if}}"></div>
+      <div class="pilot-info">
+        <div class="pilot-name">{{pilot.name}}</div>
+        <div class="pilot-creator">by {{pilot.creator}} • v{{pilot.current.version}}</div>
+      </div>
+      <button type="button" 
+              class="clear-pilot"
+              hx-post="/match/clear-pilot"
+              hx-vals='{"pilot_letter": "{{pilot_letter}}"}'
+              hx-target="#pilot-{{pilot_letter}}-container"
+              hx-swap="outerHTML">×</button>
+    </div>
+  </div>
+  <input type="hidden" name="pilot_{{pilot_letter}}" value="{{pilot.id}}">
+{{else}}
+  <!-- Search input -->
+  <input 
+    id="pilot-{{pilot_letter}}-search" 
+    class="input pilot-search" 
+    type="text" 
+    placeholder="Search for pilot {{pilot_letter}}..." 
+    autocomplete="off"
+    hx-post="/match/search-pilots"
+    hx-trigger="keyup changed delay:200ms"
+    hx-vals='{"pilot_letter": "{{pilot_letter}}"}'
+    hx-target="#pilot-{{pilot_letter}}-dropdown"
+    hx-include="input[name^='pilot_']"
+  />
+  <div id="pilot-{{pilot_letter}}-dropdown" class="pilot-dropdown hidden"></div>
+{{/if}}

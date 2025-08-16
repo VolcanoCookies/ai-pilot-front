@@ -15,6 +15,7 @@ use rocket::{
     futures::future::join_all,
     http::{Cookie, CookieJar, Status},
     response::Redirect,
+    tokio::spawn,
 };
 use rocket_dyn_templates::{Template, context};
 use rocket_okapi::{
@@ -79,11 +80,13 @@ async fn partial_home_pilots(
                 .unwrap_or_else(|| p.owner_id.clone())
         };
 
+        let creator_user = sso_client.get_user(&p.owner_id).await;
+
         context! {
             id: p.id.to_string(),
             name: p.name,
             current: context! { version: p.current.version },
-            creator: username,
+            creator_user: creator_user,
             is_own: is_own,
         }
     }))
@@ -98,14 +101,16 @@ async fn partial_home_pilots(
 // Partials: Home Matches (recent)
 #[get("/partials/home/matches")]
 async fn partial_home_matches(api_client: &State<ApiClient>) -> Result<Template, ApiErrors> {
-    let matches = api_client.get_matches(None, None).await;
+    let mut matches = api_client.get_matches(None, None).await;
+
+    matches.sort_by_key(|m| -m.created_at);
 
     let matches_ctx: Vec<_> = join_all(matches.into_iter().map(async |m| {
         let team_a_name = api_client.get_cached_pilot_name(&m.team_a.aip_id.to_string()).await.unwrap_or(m.team_a.aip_id.to_string());
         let team_b_name = api_client.get_cached_pilot_name(&m.team_b.aip_id.to_string()).await.unwrap_or(m.team_b.aip_id.to_string());
 
-        let download_url = if let Some(reply_id) = m.reply_id {
-            Some(format!("{}/replay?matchId={}", api_client.base_url(), reply_id))
+        let download_url = if let Some(replay_id) = m.replay_id {
+            Some(format!("{}/replay?replayId={}", api_client.base_url(), replay_id))
         } else {
             None
         };
@@ -247,6 +252,17 @@ async fn upload_page(
             my_names: my_names,
             other_names: other_names,
             preset_name: name,
+            user: user,
+            build_info: build_info_ctx()
+        },
+    ))
+}
+
+#[get("/match/create")]
+async fn match_create_page(user: ApiUser) -> Result<Template, ApiErrors> {
+    Ok(Template::render(
+        "match_create",
+        context! {
             user: user,
             build_info: build_info_ctx()
         },
@@ -444,14 +460,6 @@ async fn pilot_stats_page(
         .as_ref()
         .map(|info| discord_avatar_url(&pilot_owner_id, &info.avatar));
 
-    let user_ctx = if let Some(user) = user {
-        Some(
-            context! { id: user.id, username: user.username, avatar_url: discord_avatar_url(&user.discord_id, &user.avatar) },
-        )
-    } else {
-        None
-    };
-
     Ok(Template::render(
         "pilot_stats",
         context! {
@@ -475,7 +483,7 @@ async fn pilot_stats_page(
             // Pass raw matches data for JavaScript filtering
             all_matches_json: serde_json::to_string(&matches).unwrap_or_default(),
             pilot_id: pilot.id.to_string(),
-            user: user_ctx,
+            user: user,
             build_info: build_info_ctx()
         },
     ))
@@ -495,7 +503,7 @@ async fn partial_pilot_version_stats(
     let all_matches = api_client
         .get_matches(
             Some(pilot.id.to_string().as_str()),
-            Some(pilot.current.version),
+            Some(version),
         )
         .await;
 
@@ -610,6 +618,224 @@ async fn partial_pilot_version_stats(
     ))
 }
 
+#[get("/users")]
+async fn users_page(
+    user: Option<ApiUser>,
+    api_client: &State<ApiClient>,
+    sso_client: &State<SSOClient>,
+) -> Result<Template, ApiErrors> {
+    // Get all pilots to extract unique owners
+    let pilots = api_client.get_pilots().await;
+    
+    // Create a map to collect user stats
+    let mut user_map: std::collections::HashMap<String, (String, Option<String>, Vec<String>, i32, f32)> = 
+        std::collections::HashMap::new(); // owner_id -> (username, avatar_url, pilot_names, total_matches, win_rate)
+    
+    // Process each pilot to gather user information
+    for pilot in &pilots {
+        let owner_id = pilot.owner_id.clone();
+        let pilot_name = pilot.name.clone();
+        
+        // Get matches for this pilot to calculate stats
+        let matches = api_client.get_matches(Some(&pilot.id.to_string()), None).await;
+        let pilot_total_matches = matches.len();
+        let pilot_wins = matches.iter().filter(|m| {
+            (m.team_a.aip_id == pilot.id && m.winner == Winner::TeamA) ||
+            (m.team_b.aip_id == pilot.id && m.winner == Winner::TeamB)
+        }).count();
+        
+        // Get username from Discord cache
+        let user_info = sso_client.get_user(&owner_id).await;
+        let username = user_info.as_ref()
+            .map(|u| u.username.clone())
+            .unwrap_or_else(|| owner_id.clone());
+        let avatar_url = user_info.as_ref()
+            .map(|info| discord_avatar_url(&owner_id, &info.avatar));
+        
+        // Update or insert user stats
+        let entry = user_map.entry(owner_id.clone()).or_insert((username, avatar_url, Vec::new(), 0, 0.0));
+        entry.2.push(pilot_name);
+        entry.3 += pilot_total_matches as i32;
+        
+        // Recalculate overall win rate (weighted average)
+        if entry.3 > 0 {
+            let total_wins = (entry.4 / 100.0 * (entry.3 - pilot_total_matches as i32) as f32) + pilot_wins as f32;
+            entry.4 = total_wins / entry.3 as f32 * 100.0;
+        }
+    }
+    
+    // Convert to vector with struct for easier sorting
+    let mut users: Vec<_> = user_map.into_iter()
+        .map(|(owner_id, (username, avatar_url, pilot_names, total_matches, win_rate))| {
+            (owner_id, username, avatar_url, pilot_names.len(), pilot_names, total_matches, win_rate)
+        })
+        .collect();
+    
+    // Sort by pilot count descending, then by total matches
+    users.sort_by(|a, b| {
+        let pilot_count_cmp = b.3.cmp(&a.3); // pilot count
+        if pilot_count_cmp == std::cmp::Ordering::Equal {
+            b.5.cmp(&a.5) // total matches
+        } else {
+            pilot_count_cmp
+        }
+    });
+    
+    // Convert to context objects
+    let users_ctx: Vec<_> = users.into_iter()
+        .map(|(owner_id, username, avatar_url, pilot_count, pilot_names, total_matches, win_rate)| {
+            context! {
+                owner_id: owner_id,
+                username: username,
+                avatar_url: avatar_url,
+                pilot_count: pilot_count,
+                pilot_names: pilot_names,
+                total_matches: total_matches,
+                win_rate: format!("{:.1}", win_rate),
+            }
+        })
+        .collect();
+    
+    Ok(Template::render(
+        "users",
+        context! {
+            users: users_ctx,
+            user: user,
+            build_info: build_info_ctx()
+        },
+    ))
+}
+
+#[get("/user/<owner_id>")]
+async fn user_page(
+    user: Option<ApiUser>,
+    owner_id: &str,
+    api_client: &State<ApiClient>,
+    sso_client: &State<SSOClient>,
+) -> Result<Template, ApiErrors> {
+    // Get all pilots for this user
+    let all_pilots = api_client.get_pilots().await;
+    let user_pilots: Vec<_> = all_pilots.into_iter()
+        .filter(|p| p.owner_id == owner_id)
+        .collect();
+    
+    if user_pilots.is_empty() {
+        return Err(ApiErrors::NotFound("User not found or has no pilots".into()));
+    }
+    
+    // Get user info from Discord cache
+    let user_info = sso_client.get_user(owner_id).await;
+    let username = user_info.as_ref()
+        .map(|info| info.username.clone())
+        .unwrap_or_else(|| owner_id.to_string());
+    let user_avatar = user_info.as_ref()
+        .map(|info| discord_avatar_url(owner_id, &info.avatar));
+    
+    // Gather all matches for user's pilots
+    let mut all_matches = Vec::new();
+    let mut pilot_stats = Vec::new();
+    
+    for pilot in &user_pilots {
+        let matches = api_client.get_matches(Some(&pilot.id.to_string()), None).await;
+        all_matches.extend(matches.clone());
+        
+        // Calculate stats for this pilot
+        let total_matches = matches.len();
+        let wins = matches.iter().filter(|m| {
+            (m.team_a.aip_id == pilot.id && m.winner == Winner::TeamA) ||
+            (m.team_b.aip_id == pilot.id && m.winner == Winner::TeamB)
+        }).count();
+        let losses = total_matches - wins;
+        let win_rate = if total_matches > 0 {
+            wins as f32 / total_matches as f32 * 100.0
+        } else {
+            0.0
+        };
+        
+        pilot_stats.push((context! {
+            name: pilot.name.clone(),
+            current_version: pilot.current.version,
+            total_matches: total_matches,
+            wins: wins,
+            losses: losses,
+            win_rate: format!("{:.1}", win_rate),
+        }, total_matches));
+    }
+    
+    // Sort pilots by total matches descending
+    pilot_stats.sort_by(|a, b| b.1.cmp(&a.1));
+    
+    // Convert to context objects
+    let pilot_stats: Vec<_> = pilot_stats.into_iter().map(|(ctx, _)| ctx).collect();
+    
+    // Calculate overall user stats
+    let total_matches = all_matches.len();
+    let total_wins = all_matches.iter().filter(|m| {
+        user_pilots.iter().any(|pilot| {
+            (m.team_a.aip_id == pilot.id && m.winner == Winner::TeamA) ||
+            (m.team_b.aip_id == pilot.id && m.winner == Winner::TeamB)
+        })
+    }).count();
+    let total_losses = total_matches - total_wins;
+    let overall_win_rate = if total_matches > 0 {
+        total_wins as f32 / total_matches as f32 * 100.0
+    } else {
+        0.0
+    };
+    
+    // Get recent matches (last 20, sorted by date)
+    let mut sorted_matches = all_matches.clone();
+    sorted_matches.sort_by(|a, b| b.created_at.cmp(&a.created_at));
+    let recent_matches = join_all(sorted_matches.iter().take(20).map(async |m| {
+        // Find which pilot was involved in this match
+        let user_pilot = user_pilots.iter().find(|pilot| {
+            m.team_a.aip_id == pilot.id || m.team_b.aip_id == pilot.id
+        }).unwrap();
+        
+        let (opponent_id, opponent_version, pilot_version, won) = if m.team_a.aip_id == user_pilot.id {
+            (m.team_b.aip_id, m.team_b.version, m.team_a.version, m.winner == Winner::TeamA)
+        } else {
+            (m.team_a.aip_id, m.team_a.version, m.team_b.version, m.winner == Winner::TeamB)
+        };
+
+        let opponent_name = api_client.get_cached_pilot_name(&opponent_id.to_string())
+            .await
+            .unwrap_or(opponent_id.to_string());
+        
+        context! {
+            pilot_name: user_pilot.name.clone(),
+            pilot_version: pilot_version,
+            opponent: opponent_name,
+            opponent_version: opponent_version,
+            won: won,
+            created_at: format_date_time(&chrono::DateTime::<chrono::Utc>::from_timestamp(m.created_at / 1_000, 0).unwrap_or_default()),
+            is_manual: m.manual_run,
+        }
+    })).await;
+    
+    Ok(Template::render(
+        "user",
+        context! {
+            target_user: context! {
+                owner_id: owner_id,
+                username: username,
+                avatar: user_avatar,
+            },
+            overall_stats: context! {
+                pilot_count: user_pilots.len(),
+                total_matches: total_matches,
+                wins: total_wins,
+                losses: total_losses,
+                win_rate: format!("{:.1}", overall_win_rate),
+            },
+            pilots: pilot_stats,
+            recent_matches: recent_matches,
+            user: user,
+            build_info: build_info_ctx()
+        },
+    ))
+}
+
 fn render_error_page(code: u16, message: &str) -> Template {
     Template::render(
         "error",
@@ -671,6 +897,15 @@ async fn rocket() -> _ {
     let sso_client = SSOClient::new();
     let api_client = ApiClient::new();
 
+    // Pre-warm cache
+    spawn({
+        let api_client = api_client.clone();
+        async move {
+            let _ = api_client.get_pilots().await;
+            let _ = api_client.get_matches(None, None).await;
+        }
+    });
+
     rocket::build()
         .manage(client)
         .manage(sso_client)
@@ -685,8 +920,11 @@ async fn rocket() -> _ {
                 partial_home_matches,
                 user_tokens_page,
                 upload_page,
+                match_create_page,
                 pilot_stats_page,
                 partial_pilot_version_stats,
+                users_page,
+                user_page,
                 login_callback_redirect_page,
                 login,
                 login_callback,

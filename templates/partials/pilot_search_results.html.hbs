@@ -1,0 +1,17 @@
+{{#if pilots.0}}
+  {{#each pilots}}
+    <div class="dropdown-item" 
+         hx-post="/match/select-pilot" 
+         hx-vals='{"pilot_id": "{{this.id}}", "pilot_letter": "{{@root.pilot_letter}}"}'
+         hx-target="#pilot-{{@root.pilot_letter}}-container"
+         hx-swap="outerHTML">
+      <div class="glyph {{#if this.is_own}}own-pilot{{else}}other-pilot{{/if}}"></div>
+      <div class="pilot-info">
+        <div class="pilot-name">{{this.name}}</div>
+        <div class="pilot-creator">by {{this.creator}} • v{{this.current.version}}</div>
+      </div>
+    </div>
+  {{/each}}
+{{else}}
+  <div class="dropdown-item no-results">No pilots found</div>
+{{/if}}

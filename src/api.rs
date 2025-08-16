@@ -1,15 +1,23 @@
 use std::env;
 
-use client::models::{AiPilot, MatchResult};
+use client::models::{AiPilot, AipVersion, MatchResult};
 use lazy_static::lazy_static;
 use regex::Regex;
-use rocket::{Data, Route, State, data::ToByteUnit, http::Status, serde::json::Json};
+use rocket::{
+    Data, Route, State, data::ToByteUnit, futures::future::join_all, http::Status,
+    serde::json::Json,
+};
 use rocket_okapi::openapi;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use crate::{
-    SqliteClient, api_client::ApiClient, api_error::ApiErrors, cookie::ApiUser, model::UserToken,
+    SqliteClient,
+    api_client::ApiClient,
+    api_error::ApiErrors,
+    cookie::ApiUser,
+    model::UserToken,
+    sso_client::{DiscordUserInfo, SSOClient},
 };
 
 #[openapi]
@@ -25,16 +33,41 @@ lazy_static! {
 
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+pub struct AiPilotWithCreator {
+    pub id: uuid::Uuid,
+    pub name: String,
+    pub owner_id: String,
+    pub current: AipVersion,
+    pub versions: Vec<AipVersion>,
+    pub creator: Option<DiscordUserInfo>,
+}
+
+impl AiPilotWithCreator {
+    pub fn with_creator(pilot: AiPilot, creator: Option<DiscordUserInfo>) -> Self {
+        AiPilotWithCreator {
+            id: pilot.id,
+            name: pilot.name,
+            owner_id: pilot.owner_id,
+            current: pilot.current,
+            versions: pilot.versions,
+            creator,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
 struct GetAiPilotResponse {
-    pilots: Vec<AiPilot>,
+    pilots: Vec<AiPilotWithCreator>,
 }
 
 #[openapi]
-#[get("/aipilot?<name>")]
+#[get("/aipilots?<name>")]
 async fn api_get_ai_pilots(
     _user: ApiUser,
     name: Option<&str>,
     api_client: &State<ApiClient>,
+    sso_client: &State<SSOClient>,
 ) -> Result<Json<GetAiPilotResponse>, ApiErrors> {
     let pilots = if let Some(name) = name {
         vec![
@@ -46,6 +79,12 @@ async fn api_get_ai_pilots(
     } else {
         api_client.get_pilots().await
     };
+
+    let pilots = join_all(pilots.into_iter().map(async |p| {
+        let user = sso_client.get_user(&p.owner_id).await;
+        AiPilotWithCreator::with_creator(p, user)
+    }))
+    .await;
 
     Ok(Json(GetAiPilotResponse { pilots }))
 }
@@ -63,6 +102,26 @@ async fn api_get_matches(
 ) -> Result<Json<GetMatchResponse>, ApiErrors> {
     let matches = api_client.get_matches(None, None).await;
     Ok(Json(GetMatchResponse { matches }))
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct CreateMatchRequest {
+    pub pilot_a: String,
+    pub pilot_b: String,
+}
+
+#[openapi]
+#[post("/matches?<pilot_a>&<pilot_b>")]
+async fn api_post_match(
+    _user: ApiUser,
+    pilot_a: &str,
+    pilot_b: &str,
+    api_client: &State<ApiClient>,
+) -> Result<String, ApiErrors> {
+    api_client
+        .create_match(pilot_a, pilot_b)
+        .await
+        .map_err(|e| ApiErrors::InternalError(format!("Failed to create match: {}", e).into()))
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
@@ -152,6 +211,7 @@ pub fn routes() -> Vec<Route> {
         api_health_check,
         api_get_ai_pilots,
         api_get_matches,
+        api_post_match,
         api_upload_ai_pilot,
         api_create_user_token,
         api_delete_user_token,

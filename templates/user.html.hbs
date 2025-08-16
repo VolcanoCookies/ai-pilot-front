@@ -1,0 +1,155 @@
+{{#> layouts/main title=target_user.username}}
+
+<div class="container">
+  <!-- User Header -->
+  <section class="stats-header">
+    <div class="stats-header-main">
+      <div class="user-info">
+        {{#if target_user.avatar}}
+        <img src="{{target_user.avatar}}" alt="{{target_user.username}}" class="creator-avatar large" />
+        {{/if}}
+        <div>
+          <h1 class="stats-title">{{target_user.username}}</h1>
+          <div class="stats-meta">
+            <span class="user-id">{{target_user.owner_id}}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="stats-header-actions">
+      <a href="/users" class="btn ghost">← Back to Users</a>
+    </div>
+  </section>
+
+  <!-- Stats Grid -->
+  <div class="stats-grid">
+    <!-- Overall Stats -->
+    <section class="glass panel">
+      <div class="panel-header">
+        <div class="panel-title">
+          <span class="glyph"></span>
+          <span>Overall Statistics</span>
+        </div>
+      </div>
+      <div class="panel-body">
+        <div class="stats-overview">
+          <div class="stat-item">
+            <div class="stat-value">{{overall_stats.pilot_count}}</div>
+            <div class="stat-label">Pilots</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-value">{{overall_stats.total_matches}}</div>
+            <div class="stat-label">Total Matches</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-value success">{{overall_stats.wins}}</div>
+            <div class="stat-label">Wins</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-value danger">{{overall_stats.losses}}</div>
+            <div class="stat-label">Losses</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-value">{{overall_stats.win_rate}}%</div>
+            <div class="stat-label">Win Rate</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- User Pilots -->
+    <section class="glass panel">
+      <div class="panel-header">
+        <div class="panel-title">
+          <span class="glyph purple"></span>
+          <span>Pilots</span>
+        </div>
+      </div>
+      <div class="panel-body panel-scroll">
+        {{#if pilots.0}}
+          {{#each pilots}}
+            <div class="row row-clickable" onclick="window.location.href='/pilot/{{this.name}}'">
+              <div class="glyph own-pilot"></div>
+              <div class="row-main">
+                <div class="row-title">{{this.name}}</div>
+                <div class="row-sub">
+                  <span class="pilot-version">v{{this.current_version}}</span>
+                  <span class="pilot-separator">•</span>
+                  <span class="match-result">
+                    <span class="stat-wins">{{this.wins}}W</span> - <span class="stat-losses">{{this.losses}}L</span>
+                  </span>
+                  <span class="pilot-separator">•</span>
+                  <span>{{this.win_rate}}% win rate</span>
+                  <span class="pilot-separator">•</span>
+                  <span>{{this.total_matches}} matches</span>
+                </div>
+              </div>
+            </div>
+          {{/each}}
+        {{else}}
+          <div class="card glass center">
+            <div class="card-title">No pilots found</div>
+            <p class="muted">This user hasn't uploaded any pilots.</p>
+          </div>
+        {{/if}}
+      </div>
+    </section>
+
+    <!-- Recent Matches -->
+    <section class="glass panel">
+      <div class="panel-header">
+        <div class="panel-title">
+          <span class="glyph"></span>
+          <span>Recent Matches</span>
+        </div>
+      </div>
+      <div class="panel-body panel-scroll">
+        {{#if recent_matches.0}}
+          {{#each recent_matches}}
+            <div class="row no-hover">
+              <div class="match-result-icon {{#if this.won}}success{{else}}danger{{/if}}">
+                {{#if this.won}}W{{else}}L{{/if}}
+              </div>
+              <div class="row-main">
+                <div class="row-title">{{this.pilot_name}} vs {{this.opponent}}</div>
+                <div class="row-sub">
+                  <span>v{{this.pilot_version}} vs v{{this.opponent_version}}</span>
+                  <span class="pilot-separator">•</span>
+                  <span>{{#if this.is_manual}}Manual{{else}}Auto{{/if}}</span>
+                  <span class="pilot-separator">•</span>
+                  <span>{{this.created_at}}</span>
+                </div>
+              </div>
+            </div>
+          {{/each}}
+        {{else}}
+          <div class="card glass center">
+            <div class="card-title">No recent matches</div>
+            <p class="muted">This user's pilots haven't participated in any matches yet.</p>
+          </div>
+        {{/if}}
+      </div>
+    </section>
+  </div>
+</div>
+
+<style>
+.user-info {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+
+.creator-avatar.large {
+  width: 60px;
+  height: 60px;
+}
+
+.user-id {
+  color: var(--text-secondary);
+  font-family: monospace;
+  font-size: 0.9em;
+}
+</style>
+
+{{/layouts/main}}

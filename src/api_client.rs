@@ -7,6 +7,8 @@ use client::{
 use moka::future::Cache;
 use rocket::futures::future::join_all;
 use uuid::Uuid;
+
+#[derive(Debug, Clone)]
 pub struct ApiClient {
     configuration: Configuration,
     pilot_name_cache: Cache<String, String>,
@@ -68,6 +70,15 @@ impl ApiClient {
                 Vec::new()
             }
         }
+    }
+
+    pub async fn create_match(&self, pilot_a: &str, pilot_b: &str) -> Result<String, String> {
+        let res =
+            client::apis::default_api::start_manual_fight(&self.configuration, pilot_a, pilot_b)
+                .await
+                .map_err(|e| e.to_string())?;
+
+        Ok(res.match_id.to_string())
     }
 
     pub async fn get_pilot(&self, pilot_id: &str) -> Option<AiPilot> {

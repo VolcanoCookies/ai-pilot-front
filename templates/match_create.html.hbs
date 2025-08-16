@@ -1,0 +1,395 @@
+{{#> layouts/main title="Create Match"}}
+
+<div class="container">
+  <div class="panel glass">
+    <div class="panel-header">
+      <div class="panel-title">
+        <span class="glyph"></span>
+        <span>Create Match</span>
+      </div>
+    </div>
+
+    <div class="panel-body">
+      <div class="muted" style="margin: -2px 0 24px 0;">Select two AI pilots to battle against each other</div>
+      
+      <form id="match-form" class="form-grid" onsubmit="return false;">
+        <!-- Pilot A Selection -->
+        <div class="field full">
+          <label class="label" for="pilot-a-search">Pilot A</label>
+          <div class="pilot-selector">
+            <input 
+              id="pilot-a-search" 
+              class="input pilot-search" 
+              type="text" 
+              placeholder="Search for pilot A..." 
+              autocomplete="off"
+              data-pilot="a"
+            />
+            <div id="pilot-a-dropdown" class="pilot-dropdown hidden"></div>
+            <input type="hidden" name="pilot_a" id="pilot-a-id">
+          </div>
+        </div>
+
+        <!-- VS Divider -->
+        <div class="field full vs-divider">
+          <div class="vs-text">VS</div>
+        </div>
+
+        <!-- Pilot B Selection -->
+        <div class="field full">
+          <label class="label" for="pilot-b-search">Pilot B</label>
+          <div class="pilot-selector">
+            <input 
+              id="pilot-b-search" 
+              class="input pilot-search" 
+              type="text" 
+              placeholder="Search for pilot B..." 
+              autocomplete="off"
+              data-pilot="b"
+            />
+            <div id="pilot-b-dropdown" class="pilot-dropdown hidden"></div>
+            <input type="hidden" name="pilot_b" id="pilot-b-id">
+          </div>
+        </div>
+
+        <!-- Status Display -->
+        <div class="field full">
+          <div id="status" class="alert" style="display:none;"></div>
+        </div>
+
+        <!-- Form Actions -->
+        <div class="field full form-actions" style="gap: 12px;">
+          <button id="submit-btn" class="btn primary" type="submit" disabled>Create Match</button>
+          <a href="/" class="btn ghost">Cancel</a>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script>
+(function() {
+  let selectedPilots = { a: null, b: null };
+  let pilots = [];
+
+  const pilotASearch = document.getElementById('pilot-a-search');
+  const pilotBSearch = document.getElementById('pilot-b-search');
+  const submitBtn = document.getElementById('submit-btn');
+  const statusEl = document.getElementById('status');
+
+  // Load pilots data on page load
+  async function loadPilots() {
+    try {
+      const response = await fetch('/api/aipilots');
+      pilots = (await response.json()).pilots;
+      
+      // Sort pilots: own pilots first, then by name
+      pilots.sort((a, b) => {
+        if (a.is_own !== b.is_own) {
+          return b.is_own - a.is_own; // Own pilots first
+        }
+        return a.name.localeCompare(b.name); // Then alphabetical
+      });
+    } catch (error) {
+      console.error('Failed to load pilots:', error);
+      showStatus('error', 'Failed to load pilots data');
+    }
+  }
+
+  // Escape HTML to prevent XSS
+  function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+  }
+
+  // Filter pilots based on search term
+  function filterPilots(searchTerm, excludePilot = null) {
+    const term = searchTerm.toLowerCase().trim();
+    
+    return pilots
+      .filter(pilot => {
+        if (excludePilot && pilot.id === excludePilot.id) return false;
+        if (!term) return true; // Show all pilots when no search term
+        return pilot.name.toLowerCase().includes(term) ||
+               pilot.creator.username.toLowerCase().includes(term);
+      });
+  }
+
+  // Show dropdown with search results
+  function showDropdown(pilotLetter, results) {
+    const dropdown = document.getElementById(`pilot-${pilotLetter}-dropdown`);
+    
+    if (results.length === 0) {
+      dropdown.innerHTML = '<div class="dropdown-item no-results">No pilots found</div>';
+    } else {
+      dropdown.innerHTML = results.map(pilot => `
+        <div class="dropdown-item" data-pilot-id="${pilot.id}" data-pilot="${pilotLetter}">
+          <div class="glyph ${pilot.is_own ? 'own-pilot' : 'other-pilot'}"></div>
+          <div class="pilot-info">
+            <div class="pilot-name">${escapeHtml(pilot.name)}</div>
+            <div class="pilot-creator">by ${escapeHtml(pilot.creator.username)} • v${pilot.current.version}</div>
+          </div>
+        </div>
+      `).join('');
+    }
+    
+    dropdown.classList.remove('hidden');
+  }
+
+  // Hide dropdown
+  function hideDropdown(pilotLetter) {
+    const dropdown = document.getElementById(`pilot-${pilotLetter}-dropdown`);
+    dropdown.classList.add('hidden');
+  }
+
+  // Select a pilot
+  function selectPilot(pilotLetter, pilot) {
+    selectedPilots[pilotLetter] = pilot;
+    
+    const searchInput = document.getElementById(`pilot-${pilotLetter}-search`);
+    const hiddenInput = document.getElementById(`pilot-${pilotLetter}-id`);
+    
+    // Update search input to show selected pilot and set hidden input
+    searchInput.value = pilot.name;
+    searchInput.classList.add('pilot-selected-input');
+    hiddenInput.value = pilot.id;
+    
+    hideDropdown(pilotLetter);
+    updateSubmitButton();
+  }
+
+  // Clear pilot selection
+  function clearPilot(pilotLetter) {
+    selectedPilots[pilotLetter] = null;
+    
+    const searchInput = document.getElementById(`pilot-${pilotLetter}-search`);
+    const hiddenInput = document.getElementById(`pilot-${pilotLetter}-id`);
+    
+    // Clear search input and remove selected styling
+    searchInput.value = '';
+    searchInput.classList.remove('pilot-selected-input');
+    hiddenInput.value = '';
+    
+    updateSubmitButton();
+  }
+
+  // Update submit button state
+  function updateSubmitButton() {
+    const canSubmit = selectedPilots.a && selectedPilots.b && selectedPilots.a.id !== selectedPilots.b.id;
+    submitBtn.disabled = !canSubmit;
+    
+    if (selectedPilots.a && selectedPilots.b && selectedPilots.a.id === selectedPilots.b.id) {
+      showStatus('error', 'Cannot create a match between the same pilot');
+    } else if (canSubmit) {
+      hideStatus();
+    }
+  }
+
+  // Show status message
+  function showStatus(kind, msg) {
+    statusEl.textContent = msg;
+    statusEl.className = 'alert';
+    if (kind === 'success') statusEl.classList.add('success');
+    else if (kind === 'error') statusEl.classList.add('error');
+    else statusEl.classList.add('info');
+    statusEl.style.display = 'block';
+  }
+
+  // Hide status message
+  function hideStatus() {
+    statusEl.style.display = 'none';
+  }
+
+  // Handle search input
+  function handleSearch(pilotLetter, searchTerm) {
+    const otherPilot = selectedPilots[pilotLetter === 'a' ? 'b' : 'a'];
+    const results = filterPilots(searchTerm, otherPilot);
+    showDropdown(pilotLetter, results);
+  }
+
+  // Event listeners
+  pilotASearch.addEventListener('input', (e) => handleSearch('a', e.target.value));
+  pilotBSearch.addEventListener('input', (e) => handleSearch('b', e.target.value));
+  
+  // Show all pilots when input gets focus
+  pilotASearch.addEventListener('focus', (e) => {
+    if (selectedPilots.a) {
+      // If a pilot is already selected, clear it when focusing
+      clearPilot('a');
+    }
+    handleSearch('a', e.target.value);
+  });
+  pilotBSearch.addEventListener('focus', (e) => {
+    if (selectedPilots.b) {
+      // If a pilot is already selected, clear it when focusing
+      clearPilot('b');
+    }
+    handleSearch('b', e.target.value);
+  });
+
+  // Dropdown click handling
+  document.addEventListener('click', (e) => {
+    if (e.target.closest('.dropdown-item:not(.no-results)')) {
+      const item = e.target.closest('.dropdown-item');
+      const pilotId = item.dataset.pilotId;
+      const pilotLetter = item.dataset.pilot;
+      
+      if (pilotId) {
+        const pilot = pilots.find(p => p.id === pilotId);
+        if (pilot) selectPilot(pilotLetter, pilot);
+      }
+    }
+    
+    // Hide dropdowns when clicking outside
+    if (!e.target.closest('.pilot-selector')) {
+      hideDropdown('a');
+      hideDropdown('b');
+    }
+  });
+
+  // Form submission using regular form data
+  document.getElementById('match-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    
+    const formData = new FormData(e.target);
+    const pilotA = formData.get('pilot_a');
+    const pilotB = formData.get('pilot_b');
+    
+    if (!pilotA || !pilotB) {
+      showStatus('error', 'Please select both pilots');
+      return;
+    }
+    
+    if (pilotA === pilotB) {
+      showStatus('error', 'Cannot create a match between the same pilot');
+      return;
+    }
+    
+    submitBtn.disabled = true;
+    submitBtn.classList.add('loading');
+    showStatus('info', 'Creating match...');
+    
+    try {
+      const response = await fetch(`/api/matches?pilot_a=${pilotA}&pilot_b=${pilotB}`, {
+        method: 'POST',
+      });
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(errorText || 'Failed to create match');
+      }
+      
+      showStatus('success', 'Match created successfully!');
+      setTimeout(() => {
+        window.location.href = '/';
+      }, 1000);
+      
+    } catch (error) {
+      console.error('Match creation failed:', error);
+      showStatus('error', 'Failed to create match: ' + error.message);
+      submitBtn.disabled = false;
+      submitBtn.classList.remove('loading');
+    }
+  });
+
+  // Initialize
+  loadPilots();
+  updateSubmitButton();
+})();
+</script>
+
+<style>
+.vs-divider {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 20px 0;
+}
+
+.vs-text {
+  background: var(--accent);
+  color: white;
+  padding: 16px 24px;
+  border-radius: 8  px;
+  font-weight: bold;
+  font-size: 16px;
+}
+
+.pilot-selector {
+  position: relative;
+}
+
+.pilot-selected-input {
+  background: var(--surface-elevated) !important;
+  border-color: var(--accent) !important;
+  color: var(--accent) !important;
+  font-weight: 500 !important;
+}
+
+.pilot-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
+  backdrop-filter: blur(8px);
+  z-index: 1000;
+  max-height: 300px;
+  overflow-y: auto;
+  margin-top: 4px;
+}
+
+.pilot-dropdown.hidden {
+  display: none;
+}
+
+.dropdown-item {
+  padding: 12px;
+  cursor: pointer;
+  border-bottom: 1px solid var(--border-muted);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  transition: background-color 0.15s ease;
+}
+
+.dropdown-item:last-child {
+  border-bottom: none;
+}
+
+.dropdown-item:hover {
+  background: var(--surface-hover);
+}
+
+.dropdown-item.no-results {
+  color: var(--text-muted);
+  cursor: default;
+  text-align: center;
+  padding: 16px;
+}
+
+.dropdown-item.no-results:hover {
+  background: transparent;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .pilot-dropdown {
+    max-height: 200px;
+  }
+  
+  .dropdown-item {
+    padding: 10px;
+  }
+  
+  .selected-pilot {
+    padding: 10px;
+  }
+}
+</style>
+
+{{/layouts/main}}

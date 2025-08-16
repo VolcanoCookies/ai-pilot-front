@@ -2,15 +2,16 @@ use std::{env, time::Duration};
 
 use log::error;
 use moka::future::Cache;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize, JsonSchema)]
 pub struct DiscordUserInfo {
     pub id: String,
     pub username: String,
     pub avatar: String,
 }
 
+#[derive(Debug, Clone)]
 pub struct SSOClient {
     client: reqwest::Client,
     cache: Cache<String, DiscordUserInfo>,

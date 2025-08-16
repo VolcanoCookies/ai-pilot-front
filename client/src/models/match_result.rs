@@ -30,8 +30,8 @@ pub struct MatchResult {
     pub created_at: i64,
     #[serde(rename = "normalizedName")]
     pub normalized_name: String,
-    #[serde(rename = "replyId")]
-    pub reply_id: Option<String>,
+    #[serde(rename = "replayId")]
+    pub replay_id: Option<String>,
 }
 
 impl MatchResult {
@@ -43,7 +43,7 @@ impl MatchResult {
         manual_run: bool,
         created_at: i64,
         normalized_name: String,
-        reply_id: Option<String>,
+        replay_id: Option<String>,
     ) -> MatchResult {
         MatchResult {
             id,
@@ -53,7 +53,7 @@ impl MatchResult {
             manual_run,
             created_at,
             normalized_name,
-            reply_id,
+            replay_id,
         }
     }
 }

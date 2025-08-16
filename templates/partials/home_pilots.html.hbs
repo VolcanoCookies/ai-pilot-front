@@ -22,9 +22,17 @@
             <div class="row-title">{{this.name}}</div>
             <div class="row-sub">
               {{#if this.is_own}}
-                <span class="pilot-creator own-creator">by {{this.creator}}</span>
+                <span class="pilot-creator other-creator">by 
+                  {{#if this.creator_user.avatar}}
+                    <img src="https://cdn.discordapp.com/avatars/{{this.creator_user.id}}/{{this.creator_user.avatar}}.png" alt="{{this.creator_user.username}}" class="creator-avatar" />
+                  {{/if}}
+                  {{this.creator_user.username}}</span>
               {{else}}
-                <span class="pilot-creator other-creator">by {{this.creator}}</span>
+                <span class="pilot-creator other-creator">by 
+                  {{#if this.creator_user.avatar}}
+                    <img src="https://cdn.discordapp.com/avatars/{{this.creator_user.id}}/{{this.creator_user.avatar}}.png" alt="{{this.creator_user.username}}" class="creator-avatar" />
+                  {{/if}}
+                  {{this.creator_user.username}}</span>
               {{/if}}
               <span class="pilot-separator">•</span>
               <span class="pilot-version">v{{this.current.version}}</span>

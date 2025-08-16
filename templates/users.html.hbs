@@ -1,0 +1,394 @@
+{{#> layouts/main title="AI Pilot Users"}}
+
+<div class="container">
+  <section class="hero glass">
+    <h1>AI Pilot Users</h1>
+    <p>All users who have uploaded AI pilots to the system</p>
+  </section>
+
+  <section class="glass panel">
+    <div class="panel-header">
+      <div class="panel-title">
+        <span class="glyph purple"></span>
+        <span>Users</span>
+      </div>
+      <div class="panel-actions">
+        <div class="sort-dropdown">
+          <button id="sort-button" class="sort-button" onclick="toggleSortMenu()">
+            <span id="sort-label">Sort by Pilots</span>
+            <span class="sort-arrow material-symbols-rounded">arrow_drop_down</span>
+          </button>
+          <div id="sort-menu" class="sort-menu hidden">
+            <div class="sort-option active" data-value="pilots">Sort by Pilots</div>
+            <div class="sort-option" data-value="matches">Sort by Matches</div>
+            <div class="sort-option" data-value="winrate">Sort by Win Rate</div>
+            <div class="sort-option" data-value="username">Sort by Username</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="panel-body panel-scroll" id="users-container">
+      {{#if users.0}}
+        {{#each users}}
+          <div class="row row-clickable user-row" onclick="window.location.href='/user/{{this.owner_id}}'" 
+               data-pilots="{{this.pilot_count}}" 
+               data-matches="{{this.total_matches}}" 
+               data-winrate="{{this.win_rate}}" 
+               data-username="{{this.username}}">
+            {{#if this.avatar_url}}
+              <img class="user-avatar" src="{{this.avatar_url}}" alt="{{this.username}}" />
+            {{else}}
+              <div class="glyph user-glyph"></div>
+            {{/if}}
+            <div class="row-main">
+              <div class="row-title">{{this.username}}</div>
+              <div class="row-sub">
+                <span class="user-stat">{{this.pilot_count}} pilot{{#if (gt this.pilot_count 1)}}s{{/if}}</span>
+                <span class="pilot-separator">•</span>
+                <span class="user-stat">{{this.total_matches}} match{{#if (ne this.total_matches 1)}}es{{/if}}</span>
+                <span class="pilot-separator">•</span>
+                <span class="user-winrate">{{this.win_rate}}% win rate</span>
+              </div>
+            </div>
+            <div class="row-spacer"></div>
+            <div class="row-actions">
+              <div class="pilot-count-display">
+                {{this.pilot_count}} pilot{{#if (gt this.pilot_count 1)}}s{{/if}}
+              </div>
+            </div>
+          </div>
+        {{/each}}
+      {{else}}
+        <div class="card glass center">
+          <div class="card-title">No users found</div>
+          <p class="muted">No users have uploaded AI pilots yet.</p>
+        </div>
+      {{/if}}
+    </div>
+  </section>
+</div>
+
+<script>
+let currentSort = 'pilots';
+let isMenuOpen = false;
+
+function toggleSortMenu() {
+  const menu = document.getElementById('sort-menu');
+  const button = document.getElementById('sort-button');
+  const arrow = button.querySelector('.sort-arrow');
+  
+  isMenuOpen = !isMenuOpen;
+  
+  if (isMenuOpen) {
+    menu.classList.remove('hidden');
+    menu.classList.add('visible');
+    arrow.style.transform = 'rotate(180deg)';
+    button.classList.add('active');
+    
+    // Position menu below button
+    const rect = button.getBoundingClientRect();
+    menu.style.top = (rect.bottom + 4) + 'px';
+    menu.style.left = rect.left + 'px';
+    menu.style.minWidth = rect.width + 'px';
+  } else {
+    menu.classList.remove('visible');
+    menu.classList.add('hidden');
+    arrow.style.transform = 'rotate(0deg)';
+    button.classList.remove('active');
+  }
+}
+
+function selectSort(value, label) {
+  currentSort = value;
+  document.getElementById('sort-label').textContent = label;
+  
+  // Update active state
+  document.querySelectorAll('.sort-option').forEach(option => {
+    option.classList.remove('active');
+  });
+  document.querySelector(`[data-value="${value}"]`).classList.add('active');
+  
+  toggleSortMenu();
+  sortUsers(value);
+}
+
+function sortUsers(criteria) {
+  const container = document.getElementById('users-container');
+  const rows = Array.from(container.querySelectorAll('.user-row'));
+  
+  // Add loading state
+  container.style.opacity = '0.7';
+  
+  setTimeout(() => {
+    rows.sort((a, b) => {
+      let aVal, bVal;
+      
+      switch(criteria) {
+        case 'pilots':
+          aVal = parseInt(a.dataset.pilots);
+          bVal = parseInt(b.dataset.pilots);
+          return bVal - aVal; // Descending
+        case 'matches':
+          aVal = parseInt(a.dataset.matches);
+          bVal = parseInt(b.dataset.matches);
+          return bVal - aVal; // Descending
+        case 'winrate':
+          aVal = parseFloat(a.dataset.winrate);
+          bVal = parseFloat(b.dataset.winrate);
+          return bVal - aVal; // Descending
+        case 'username':
+          aVal = a.dataset.username.toLowerCase();
+          bVal = b.dataset.username.toLowerCase();
+          return aVal.localeCompare(bVal); // Ascending
+        default:
+          return 0;
+      }
+    });
+    
+    // Re-append sorted rows with stagger animation
+    rows.forEach((row, index) => {
+      row.style.opacity = '0';
+      row.style.transform = 'translateY(10px)';
+      setTimeout(() => {
+        container.appendChild(row);
+        row.style.opacity = '1';
+        row.style.transform = 'translateY(0)';
+      }, index * 20);
+    });
+    
+    container.style.opacity = '1';
+  }, 100);
+}
+
+// Close menu when clicking outside
+document.addEventListener('click', (e) => {
+  if (!e.target.closest('.sort-dropdown') && isMenuOpen) {
+    toggleSortMenu();
+  }
+});
+
+// Handle option clicks
+document.addEventListener('click', (e) => {
+  if (e.target.classList.contains('sort-option')) {
+    const value = e.target.dataset.value;
+    const label = e.target.textContent;
+    selectSort(value, label);
+  }
+});
+
+// Initialize with default sorting
+document.addEventListener('DOMContentLoaded', () => {
+  sortUsers('pilots');
+});
+</script>
+
+<style>
+.hero p {
+  color: var(--text-muted);
+  font-size: 1.1em;
+  margin-top: 10px;
+}
+
+/* Custom Dropdown Styling */
+.sort-dropdown {
+  position: relative;
+  display: inline-block;
+}
+
+.sort-button {
+  appearance: none;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  padding: 8px 16px;
+  border-radius: var(--radius-md);
+  font-weight: 500;
+  font-size: 14px;
+  line-height: 1.4;
+  white-space: nowrap;
+  transition: all 0.15s ease;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 160px;
+  justify-content: space-between;
+}
+
+.sort-button:hover {
+  background: var(--surface-hover);
+  border-color: var(--accent-muted);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-md);
+}
+
+.sort-button.active {
+  border-color: var(--accent-muted);
+  background: var(--surface-hover);
+}
+
+.sort-arrow {
+  transition: transform 0.2s ease;
+  font-size: 18px;
+  color: var(--text-muted);
+}
+
+.sort-menu {
+  position: fixed;
+  z-index: 1000;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  overflow: hidden;
+  transition: all 0.2s ease;
+  opacity: 0;
+  transform: translateY(-8px) scale(0.95);
+}
+
+.sort-menu.visible {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+}
+
+.sort-menu.hidden {
+  opacity: 0;
+  transform: translateY(-8px) scale(0.95);
+  pointer-events: none;
+}
+
+.sort-option {
+  padding: 6px 16px;
+  color: var(--text);
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  transition: all 0.15s ease;
+  border-bottom: 1px solid var(--border-muted);
+}
+
+.sort-option:last-child {
+  border-bottom: none;
+}
+
+.sort-option:hover {
+  background: var(--surface-hover);
+  color: var(--accent-hover);
+}
+
+.sort-option.active {
+  background: var(--accent-muted);
+  color: var(--accent-hover);
+}
+
+.sort-option.active:hover {
+  background: var(--accent);
+  color: #ffffff;
+}
+
+/* Header Glyph */
+.user-header-glyph {
+  background: var(--accent-muted);
+}
+
+.user-header-glyph::before {
+  content: "�";
+  font-size: 16px;
+  position: relative;
+  z-index: 2;
+}
+
+/* User Avatar Styling */
+.user-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 2px solid var(--border-muted);
+  flex-shrink: 0;
+  transition: border-color 0.15s ease;
+}
+
+.user-glyph {
+  background: var(--surface-elevated);
+  flex-shrink: 0;
+}
+
+/* User Info Styling */
+.user-stat {
+  color: var(--text-muted);
+}
+
+.user-winrate {
+  color: var(--success);
+  font-weight: 500;
+}
+
+.pilot-count-display {
+  color: var(--text-muted);
+  font-size: 0.85em;
+  font-weight: 500;
+  background: var(--surface-accent);
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-muted);
+  transition: all 0.15s ease;
+}
+
+/* Enhanced Row Styling */
+.row.user-row {
+  transition: all 0.15s ease;
+}
+
+.row.user-row:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-md);
+}
+
+.row.user-row:hover .user-avatar {
+  border-color: var(--accent-muted);
+}
+
+.row.user-row:hover .pilot-count-display {
+  background: var(--surface-hover);
+  border-color: var(--border);
+}
+
+/* Container transitions for sorting */
+#users-container {
+  transition: opacity 0.2s ease;
+}
+
+#users-container .user-row {
+  transition: opacity 0.15s ease, transform 0.15s ease;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .sort-button {
+    min-width: 140px;
+    font-size: 13px;
+    padding: 6px 12px;
+  }
+  
+  .sort-menu {
+    position: fixed;
+    left: 16px !important;
+    right: 16px;
+    min-width: auto !important;
+  }
+  
+  .user-avatar {
+    width: 28px;
+    height: 28px;
+  }
+  
+  .pilot-count-display {
+    font-size: 0.8em;
+    padding: 3px 6px;
+  }
+}
+</style>
+
+{{/layouts/main}}
