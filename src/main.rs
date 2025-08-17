@@ -139,7 +139,8 @@ async fn partial_home_matches(api_client: &State<ApiClient>) -> Result<Template,
 
 #[get("/login?<next>")]
 async fn login(next: Option<&str>, sso_client: &State<SSOClient>) -> Result<Redirect, ApiErrors> {
-    Ok(Redirect::to(sso_client.get_redirect_url(next)))
+    let next = format!("/{}", next.unwrap_or("/").replace("/", "__"));
+    Ok(Redirect::to(sso_client.get_redirect_url(Some(&next))))
 }
 
 #[get("/login_callback?<code>")]
@@ -185,7 +186,8 @@ async fn login_callback_next(
     cookies.add_private(Cookie::new("auth", cookie_str));
 
     // Needed since cookies are queued for redirects
-    let callback_redirect = format!("/login_callback_redirect?next={}", next.unwrap_or("/"));
+    let next = next.unwrap_or("__").replace("__", "/");
+    let callback_redirect = format!("/login_callback_redirect?next={}", next);
     Ok(Redirect::found(callback_redirect))
 }
 
