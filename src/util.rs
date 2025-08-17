@@ -48,7 +48,7 @@ pub const GIT_COMMIT_HASH: &str = {
 };
 
 const fn get_git_build_date() -> Option<chrono::DateTime<chrono::Utc>> {
-    let build_date = option_env!("DRONE_BUILD_START");
+    let build_date = option_env!("DRONE_BUILD_STARTED");
     let Some(str) = build_date else {
         return None;
     };
