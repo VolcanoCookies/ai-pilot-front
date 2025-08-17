@@ -6,13 +6,14 @@
       <span>Recent Matches</span>
     </div>
     <div class="panel-actions">
+      <a href="/matches" class="icon-btn ghost">View All</a>
       <a href="/match/create" class="icon-btn">+ Create match</a>
     </div>
   </div>
   <div class="panel-body panel-scroll">
     {{#if matches.0}}
       {{#each matches}}
-        <div class="row">
+        <div class="row row-clickable" onclick="window.location.href='/match/{{this.id}}'">
           <div class="glyph"></div>
           <div class="row-main">
             <div class="row-title match-teams-with-time">
@@ -22,14 +23,18 @@
                 <span class="team-b {{#if this.team_b.winner}}match-winner{{else}}match-loser{{/if}}">{{this.team_b.aip_name}} v{{this.team_b.version}}</span>
               </div>
               <div class="match-meta">
-                <span class="match-type">{{#if this.is_manual}}Manual{{else}}Auto{{/if}}</span>
+                {{#if this.is_manual}}
+                  <span class="match-type manual-match">Manual</span>
+                {{else}}
+                  <span class="match-type auto-match">Auto</span>
+                {{/if}}
                 <span class="match-timestamp">{{this.created_at}}</span>
               </div>
             </div>
           </div>
           <div class="row-actions" style="display: flex; align-items: center; gap: 8px;">
             {{#if this.download_url}}
-              <a href="{{this.download_url}}" download class="material-symbols-rounded" title="Download match replay" style="font-size: 18px; color: var(--text-muted); text-decoration: none; transition: color 0.2s;">download</a>
+              <a href="{{this.download_url}}" download class="material-symbols-rounded" title="Download match replay" style="font-size: 18px; color: var(--text-muted); text-decoration: none; transition: color 0.2s;" onclick="event.stopPropagation();">download</a>
             {{else}}
               <span class="material-symbols-rounded" title="Replay unavailable" style="font-size: 18px; color: rgba(166, 179, 194, 0.4); cursor: not-allowed;">file_download_off</span>
             {{/if}}

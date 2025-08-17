@@ -34,7 +34,7 @@
     </noscript>
     <link rel="stylesheet" href="/static/css/master.css">
 
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400,0,0&icon_names=arrow_drop_down,content_copy,download,file_download_off,upload" />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400,0,0&icon_names=arrow_drop_down,close,content_copy,download,file_download_off,open_in_new,play_arrow,upload" />
 
     <script src="https://unpkg.com/htmx.org@2.0.4"></script>
     <script src="https://cdn.jsdelivr.net/npm/handlebars@latest/dist/handlebars.js"></script>
@@ -49,47 +49,6 @@
         ::view-transition-old(root),
         ::view-transition-new(root) {
             animation-duration: 0.2s;
-        }
-        
-        /* Subtle copy icon */
-        .copy-value:hover {
-            opacity: 1 !important;
-        }
-        
-        /* Code block styling for copyable values */
-        code.copy-value {
-            background: rgba(255, 255, 255, 0.08);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 4px;
-            padding: 2px 6px;
-            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
-            font-weight: 400;
-            transition: background 0.2s, border-color 0.2s;
-        }
-        
-        code.copy-value:hover {
-            background: rgba(255, 255, 255, 0.12);
-            border-color: rgba(255, 255, 255, 0.2);
-        }
-        
-        /* Download icon styling */
-        .material-symbols-rounded[title*="Download"]:hover,
-        a.material-symbols-rounded:hover {
-            color: var(--text) !important;
-        }
-        
-        /* Disabled icon styling */
-        .material-symbols-rounded[style*="--text-disabled"] {
-            --text-disabled: rgba(166, 179, 194, 0.4); /* Muted text with lower opacity */
-        }
-        
-        /* Match result colors - pastel green for winner, pastel red for loser */
-        .match-winner {
-            color: #81c784; /* Pastel green */
-        }
-        
-        .match-loser {
-            color: #e57373; /* Pastel red */
         }
         
         /* Build info styling */

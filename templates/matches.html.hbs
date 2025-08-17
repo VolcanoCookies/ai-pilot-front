@@ -1,0 +1,745 @@
+{{#> layouts/main title="All Matches"}}
+
+<!-- Critical CSS to prevent layout flash -->
+<style>
+.filter-dropdown {
+  position: relative;
+  display: inline-block;
+}
+.filter-button {
+  appearance: none;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  padding: 8px 12px 8px 16px;
+  border-radius: var(--radius-md);
+  font-weight: 500;
+  font-size: 14px;
+  line-height: 1.4;
+  white-space: nowrap;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 140px;
+  justify-content: space-between;
+}
+.filter-controls {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+</style>
+
+<div class="container">
+  <!-- Matches Header -->
+  <section class="stats-header">
+    <div class="stats-header-main">
+      <h1 class="stats-title">All Matches</h1>
+      <div class="stats-meta">
+        <span class="match-count" id="total-count">{{matches_count}} total match{{#unless (eq matches_count 1)}}es{{/unless}}</span>
+      </div>
+    </div>
+    <div class="stats-header-actions">
+      <a href="/" class="btn ghost">← Back to Home</a>
+      <a href="/match/create" class="btn primary">+ Create Match</a>
+    </div>
+  </section>
+
+  <!-- Filters and Search -->
+  <section class="glass panel compact-panel">
+    <div class="panel-body compact-panel-body">
+      <div class="matches-controls">
+        <!-- Search Bar -->
+        <div class="search-container">
+          <div class="search-input-container">
+            <input 
+              type="text" 
+              id="match-search" 
+              placeholder="Search pilots or matches..." 
+              class="search-input"
+            />
+            <button id="clear-search" class="search-clear" style="display: none;">
+              <span class="material-symbols-rounded">close</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Filter Controls -->
+        <div class="filter-controls">
+          <!-- Match Type Filter -->
+          <div class="filter-dropdown">
+            <button id="type-filter-button" class="filter-button" onclick="toggleFilterMenu('type')">
+              <span id="type-filter-label">All Types</span>
+              <span class="filter-arrow material-symbols-rounded">arrow_drop_down</span>
+            </button>
+            <div id="type-filter-menu" class="filter-menu hidden">
+              <div class="filter-option active" data-value="all" data-filter="type">All Types</div>
+              <div class="filter-option" data-value="manual" data-filter="type">Manual</div>
+              <div class="filter-option" data-value="auto" data-filter="type">Auto</div>
+            </div>
+          </div>
+
+          <!-- Replay Availability Filter -->
+          <div class="filter-dropdown">
+            <button id="replay-filter-button" class="filter-button" onclick="toggleFilterMenu('replay')">
+              <span id="replay-filter-label">All Matches</span>
+              <span class="filter-arrow material-symbols-rounded">arrow_drop_down</span>
+            </button>
+            <div id="replay-filter-menu" class="filter-menu hidden">
+              <div class="filter-option active" data-value="all" data-filter="replay">All Matches</div>
+              <div class="filter-option" data-value="available" data-filter="replay">With Replay</div>
+              <div class="filter-option" data-value="unavailable" data-filter="replay">No Replay</div>
+            </div>
+          </div>
+
+          <!-- Sort Options -->
+          <div class="filter-dropdown">
+            <button id="sort-filter-button" class="filter-button" onclick="toggleFilterMenu('sort')">
+              <span id="sort-filter-label">Newest First</span>
+              <span class="filter-arrow material-symbols-rounded">arrow_drop_down</span>
+            </button>
+            <div id="sort-filter-menu" class="filter-menu hidden">
+              <div class="filter-option active" data-value="newest" data-filter="sort">Newest First</div>
+              <div class="filter-option" data-value="oldest" data-filter="sort">Oldest First</div>
+            </div>
+          </div>
+
+          <!-- Results Count -->
+          <div class="filter-results">
+            <span id="results-count">{{matches_count}} match{{#unless (eq matches_count 1)}}es{{/unless}}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Matches List -->
+  <section class="glass panel matches-list-panel">
+    <div class="panel-body matches-panel-body">
+      <div id="matches-container" class="matches-scrollable">
+        {{#if matches.0}}
+          {{#each matches}}
+            <div class="match-row row row-clickable" 
+                 onclick="window.location.href='/match/{{this.id}}'"
+                 data-match-id="{{this.id}}"
+                 data-team-a-name="{{this.team_a.aip_name}}"
+                 data-team-a-version="{{this.team_a.version}}"
+                 data-team-a-winner="{{this.team_a.winner}}"
+                 data-team-b-name="{{this.team_b.aip_name}}"
+                 data-team-b-version="{{this.team_b.version}}"
+                 data-team-b-winner="{{this.team_b.winner}}"
+                 data-winner-name="{{this.winner_name}}"
+                 data-is-manual="{{this.is_manual}}"
+                 data-match-type="{{this.match_type}}"
+                 data-has-replay="{{this.has_replay}}"
+                 data-created-at="{{this.created_at}}"
+                 data-created-at-timestamp="{{this.created_at_timestamp}}">
+              <div class="glyph {{#if this.has_replay}}has-replay{{else}}no-replay{{/if}}"></div>
+              <div class="row-main">
+                <div class="row-title match-teams-with-info">
+                  <div class="match-teams">
+                    <span class="team-a {{#if this.team_a.winner}}match-winner{{else}}match-loser{{/if}}">
+                      {{this.team_a.aip_name}} v{{this.team_a.version}}
+                    </span>
+                    <span class="vs-text">vs</span>
+                    <span class="team-b {{#if this.team_b.winner}}match-winner{{else}}match-loser{{/if}}">
+                      {{this.team_b.aip_name}} v{{this.team_b.version}}
+                    </span>
+                  </div>
+                  <div class="match-meta">
+                    <span class="match-type {{#if this.is_manual}}manual-match{{else}}auto-match{{/if}}">
+                      {{this.match_type}}
+                    </span>
+                    <span class="pilot-separator">•</span>
+                    <span class="match-timestamp">{{this.created_at}}</span>
+                  </div>
+                </div>
+              </div>
+              <div class="row-actions">
+                {{#if this.has_replay}}
+                  <span class="material-symbols-rounded action-icon replay-available" title="Replay available">play_arrow</span>
+                {{else}}
+                  <span class="material-symbols-rounded action-icon replay-unavailable" title="No replay available">file_download_off</span>
+                {{/if}}
+              </div>
+            </div>
+          {{/each}}
+        {{else}}
+          <div class="card glass center">
+            <div class="card-title">No matches found</div>
+            <p class="muted">No matches match your current filters.</p>
+            <div class="spacer"></div>
+            <button onclick="clearAllFilters()" class="btn primary">Clear Filters</button>
+          </div>
+        {{/if}}
+      </div>
+
+      <!-- No Results Message (hidden by default) -->
+      <div id="no-results" class="card glass center" style="display: none;">
+        <div class="card-title">No matches found</div>
+        <p class="muted">No matches match your current search or filters.</p>
+        <div class="spacer"></div>
+        <button onclick="clearAllFilters()" class="btn primary">Clear Filters</button>
+      </div>
+    </div>
+  </section>
+</div>
+
+<script>
+// Extract match data from rendered HTML for client-side filtering
+function extractMatchData() {
+  const matchRows = document.querySelectorAll('.match-row[data-match-id]');
+  return Array.from(matchRows).map(row => ({
+    id: row.dataset.matchId,
+    team_a: {
+      aip_name: row.dataset.teamAName,
+      version: parseInt(row.dataset.teamAVersion),
+      winner: row.dataset.teamAWinner === 'true'
+    },
+    team_b: {
+      aip_name: row.dataset.teamBName,
+      version: parseInt(row.dataset.teamBVersion),
+      winner: row.dataset.teamBWinner === 'true'
+    },
+    winner_name: row.dataset.winnerName,
+    is_manual: row.dataset.isManual === 'true',
+    match_type: row.dataset.matchType,
+    has_replay: row.dataset.hasReplay === 'true',
+    created_at: row.dataset.createdAt,
+    created_at_timestamp: parseInt(row.dataset.createdAtTimestamp),
+    element: row
+  }));
+}
+
+let allMatches = [];
+let filteredMatches = [];
+let currentFilters = {
+  type: 'all',
+  replay: 'all',
+  sort: 'newest'
+};
+let openMenus = {
+  type: false,
+  replay: false,
+  sort: false
+};
+
+// DOM elements
+const searchInput = document.getElementById('match-search');
+const clearSearchBtn = document.getElementById('clear-search');
+const matchesContainer = document.getElementById('matches-container');
+const resultsCount = document.getElementById('results-count');
+const totalCount = document.getElementById('total-count');
+const noResults = document.getElementById('no-results');
+
+// Initialize
+function initializeMatches() {
+  allMatches = extractMatchData();
+  filteredMatches = [...allMatches];
+  
+  // If there are no matches at all, don't show "no results" (show the original empty state)
+  if (allMatches.length === 0) {
+    matchesContainer.style.display = 'block'; // Keep original "no matches" message visible
+    if (noResults) noResults.style.display = 'none';
+  }
+}
+
+// Initialize when DOM is ready
+document.addEventListener('DOMContentLoaded', initializeMatches);
+
+// Fallback initialization for navigation from other pages
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initializeMatches);
+} else {
+  // DOM already loaded
+  initializeMatches();
+}
+
+// Search functionality
+searchInput.addEventListener('input', function() {
+  const query = this.value.toLowerCase();
+  clearSearchBtn.style.display = query ? 'flex' : 'none';
+  filterAndRender();
+});
+
+clearSearchBtn.addEventListener('click', function() {
+  searchInput.value = '';
+  this.style.display = 'none';
+  searchInput.focus();
+  filterAndRender();
+});
+
+// Dropdown functionality
+function toggleFilterMenu(filterType) {
+  const menu = document.getElementById(`${filterType}-filter-menu`);
+  const button = document.getElementById(`${filterType}-filter-button`);
+  const arrow = button.querySelector('.filter-arrow');
+  
+  const isOpen = openMenus[filterType];
+  
+  // Close all other menus
+  Object.keys(openMenus).forEach(key => {
+    if (key !== filterType && openMenus[key]) {
+      closeFilterMenu(key);
+    }
+  });
+  
+  openMenus[filterType] = !isOpen;
+  
+  if (openMenus[filterType]) {
+    menu.classList.remove('hidden');
+    menu.classList.add('visible');
+    arrow.style.transform = 'rotate(180deg)';
+    button.classList.add('active');
+    
+    // Position menu below button
+    const rect = button.getBoundingClientRect();
+    menu.style.top = (rect.bottom + 4) + 'px';
+    menu.style.left = rect.left + 'px';
+    menu.style.minWidth = rect.width + 'px';
+  } else {
+    closeFilterMenu(filterType);
+  }
+}
+
+function closeFilterMenu(filterType) {
+  const menu = document.getElementById(`${filterType}-filter-menu`);
+  const button = document.getElementById(`${filterType}-filter-button`);
+  const arrow = button.querySelector('.filter-arrow');
+  
+  openMenus[filterType] = false;
+  menu.classList.remove('visible');
+  menu.classList.add('hidden');
+  arrow.style.transform = 'rotate(0deg)';
+  button.classList.remove('active');
+}
+
+function selectFilter(filterType, value, label) {
+  currentFilters[filterType] = value;
+  document.getElementById(`${filterType}-filter-label`).textContent = label;
+  
+  // Update active state
+  const menu = document.getElementById(`${filterType}-filter-menu`);
+  menu.querySelectorAll('.filter-option').forEach(option => {
+    option.classList.remove('active');
+  });
+  menu.querySelector(`[data-value="${value}"]`).classList.add('active');
+  
+  closeFilterMenu(filterType);
+  filterAndRender();
+}
+
+// Close menus when clicking outside
+document.addEventListener('click', (e) => {
+  if (!e.target.closest('.filter-dropdown')) {
+    Object.keys(openMenus).forEach(key => {
+      if (openMenus[key]) {
+        closeFilterMenu(key);
+      }
+    });
+  }
+});
+
+// Handle option clicks
+document.addEventListener('click', (e) => {
+  if (e.target.classList.contains('filter-option')) {
+    const filterType = e.target.dataset.filter;
+    const value = e.target.dataset.value;
+    const label = e.target.textContent;
+    selectFilter(filterType, value, label);
+  }
+});
+
+function filterAndRender() {
+  const searchQuery = searchInput.value.toLowerCase();
+  const typeValue = currentFilters.type;
+  const replayValue = currentFilters.replay;
+  const sortValue = currentFilters.sort;
+
+  // Check if any filters are actually active
+  const hasActiveFilters = searchQuery.trim() !== '' || 
+                          typeValue !== 'all' || 
+                          replayValue !== 'all';
+
+  // If no active filters, show all matches (only apply sorting)
+  if (!hasActiveFilters) {
+    filteredMatches = [...allMatches];
+  } else {
+    // Filter matches only when there are active filters
+    filteredMatches = allMatches.filter(match => {
+      // Search filter
+      if (searchQuery.trim() !== '') {
+        const searchTerms = `${match.team_a.aip_name} ${match.team_b.aip_name} ${match.winner_name}`.toLowerCase();
+        if (!searchTerms.includes(searchQuery)) {
+          return false;
+        }
+      }
+
+      // Type filter
+      if (typeValue !== 'all') {
+        if (typeValue === 'manual' && !match.is_manual) return false;
+        if (typeValue === 'auto' && match.is_manual) return false;
+      }
+
+      // Replay filter
+      if (replayValue !== 'all') {
+        if (replayValue === 'available' && !match.has_replay) return false;
+        if (replayValue === 'unavailable' && match.has_replay) return false;
+      }
+
+      return true;
+    });
+  }
+
+  // Always apply sorting (regardless of filters)
+  filteredMatches.sort((a, b) => {
+    if (sortValue === 'newest') {
+      return b.created_at_timestamp - a.created_at_timestamp;
+    } else {
+      return a.created_at_timestamp - b.created_at_timestamp;
+    }
+  });
+
+  // Show/hide elements and update order
+  renderMatches();
+  updateResultsCount();
+}
+
+function renderMatches() {
+  // If we have no matches at all from the server, don't manipulate the display
+  if (allMatches.length === 0) {
+    return;
+  }
+
+  // Handle filtered results
+  if (filteredMatches.length === 0) {
+    matchesContainer.style.display = 'none';
+    if (noResults) noResults.style.display = 'block';
+    return;
+  }
+
+  matchesContainer.style.display = 'block';
+  if (noResults) noResults.style.display = 'none';
+
+  // Hide all matches first using CSS class
+  allMatches.forEach(match => {
+    match.element.classList.add('hidden');
+  });
+
+  // Remove all visible elements from the container
+  const visibleElements = Array.from(matchesContainer.children).filter(child => 
+    child.classList.contains('match-row')
+  );
+  visibleElements.forEach(element => {
+    if (element.parentNode === matchesContainer) {
+      matchesContainer.removeChild(element);
+    }
+  });
+
+  // Add filtered matches back in the correct order
+  filteredMatches.forEach(match => {
+    match.element.classList.remove('hidden');
+    matchesContainer.appendChild(match.element);
+  });
+}
+
+function updateResultsCount() {
+  resultsCount.textContent = `${filteredMatches.length} match${filteredMatches.length !== 1 ? 'es' : ''}`;
+}
+
+function clearAllFilters() {
+  searchInput.value = '';
+  clearSearchBtn.style.display = 'none';
+  typeFilter.value = 'all';
+  replayFilter.value = 'all';
+  sortFilter.value = 'newest';
+  filterAndRender();
+}
+
+// Keyboard shortcuts
+document.addEventListener('keydown', function(e) {
+  // Ctrl/Cmd + K to focus search
+  if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+    e.preventDefault();
+    searchInput.focus();
+  }
+  // Escape to clear search
+  if (e.key === 'Escape' && searchInput === document.activeElement) {
+    clearSearchBtn.click();
+  }
+});
+
+// Initialize
+filterAndRender();
+</script>
+
+<style>
+/* Compact panel styling */
+.compact-panel {
+  min-height: auto;
+}
+
+.compact-panel-body {
+  padding: 12px 16px;
+}
+
+.matches-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.search-container {
+  width: 100%;
+}
+
+.search-input-container {
+  position: relative;
+  display: flex;
+  align-items: center;
+  max-width: 500px;
+}
+
+.search-input {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 14px;
+  transition: all 0.2s ease;
+}
+
+.search-input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.1);
+}
+
+.search-clear {
+  position: absolute;
+  right: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: none;
+  background: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  transition: all 0.2s ease;
+}
+
+.search-clear:hover {
+  background: var(--surface-hover);
+  color: var(--text);
+}
+
+.filter-controls {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.filter-results {
+  margin-left: auto;
+  font-size: 14px;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+/* Scrollable matches container */
+.matches-list-panel {
+  height: calc(100vh - 334px); /* Account for container padding (24px bottom) + header + controls + margins */
+  min-height: 400px;
+  display: flex;
+  flex-direction: column;
+  margin-top: 16px; 
+}
+
+.matches-panel-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+  overflow: hidden;
+}
+
+.matches-scrollable {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 12px;
+}
+
+/* Custom scrollbar styling for matches container */
+.matches-scrollable::-webkit-scrollbar {
+  width: 8px;
+}
+
+.matches-scrollable::-webkit-scrollbar-track {
+  background: var(--surface);
+  border-radius: var(--radius-md);
+}
+
+.matches-scrollable::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: var(--radius-md);
+}
+
+.matches-scrollable::-webkit-scrollbar-thumb:hover {
+  background: var(--text-subtle);
+}
+
+#matches-container {
+  display: flex;
+  flex-direction: column;
+}
+
+.match-row {
+  display: flex;
+  padding: 8px 12px;
+  gap: 8px;
+}
+
+.match-row.hidden {
+  display: none !important;
+}
+
+.match-row .glyph {
+  width: 20px;
+  height: 20px;
+}
+
+/* Override the default row-main vertical layout for matches */
+.match-row .row-main {
+  display: block;
+  flex: 1;
+  min-width: 0;
+}
+
+.match-row .row-title {
+  margin-bottom: 0;
+  white-space: normal;
+  overflow: visible;
+  text-overflow: initial;
+}
+
+.match-teams-with-info {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  width: 100%;
+}
+
+.match-teams {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+}
+
+.team {
+  font-weight: 500;
+  font-size: 14px;
+}
+
+.vs-text {
+  color: var(--text-muted);
+  font-weight: normal;
+  font-size: 13px;
+  margin: 0 4px;
+}
+
+.match-row .match-meta {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.match-timestamp {
+  color: var(--text-muted);
+}
+
+.no-replay-indicator {
+  color: rgba(239, 68, 68, 0.8);
+  font-size: 12px;
+}
+
+.action-icon {
+  font-size: 20px;
+}
+
+.replay-available {
+  color: var(--accent);
+}
+
+.replay-unavailable {
+  color: rgba(166, 179, 194, 0.4);
+}
+
+.glyph.has-replay {
+  background: var(--accent);
+}
+
+.glyph.no-replay {
+  background: rgba(166, 179, 194, 0.4);
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+  .matches-list-panel {
+    height: calc(100vh - 300px); /* Account for mobile container padding (20px bottom) + header + controls */
+    min-height: 300px;
+    margin-top: 12px; /* Bottom margin instead of top margin */
+  }
+  
+  .matches-controls {
+    gap: 12px;
+  }
+  
+  .filter-controls {
+    gap: 12px;
+    justify-content: flex-start;
+  }
+  
+  .filter-results {
+    margin-left: 0;
+    order: -1;
+  }
+  
+  .match-teams {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+  
+  .vs-text {
+    align-self: center;
+    margin: -4px 0;
+  }
+  
+  .match-row .match-meta {
+    flex-direction: row !important;
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+  
+  .search-input-container {
+    max-width: none;
+  }
+}
+</style>
+
+{{/layouts/main}}

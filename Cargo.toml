@@ -39,3 +39,4 @@ uuid = { version = "1.17.0", features = ["v4"] }
 
 client = { path = "./client" }
 moka = { version = "0.12.10", features = ["future"] }
+urlencoding = "2.1.3"

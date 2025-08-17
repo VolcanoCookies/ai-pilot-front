@@ -15,7 +15,7 @@ use rocket::{
     futures::future::join_all,
     http::{Cookie, CookieJar, Status},
     response::Redirect,
-    tokio::spawn,
+    tokio::{join, spawn},
 };
 use rocket_dyn_templates::{Template, context};
 use rocket_okapi::{
@@ -70,15 +70,6 @@ async fn partial_home_pilots(
         } else {
             false
         };
-        let username = if is_own {
-            "You".to_string()
-        } else {
-            sso_client
-                .get_user(&p.owner_id)
-                .await
-                .map(|u| u.username)
-                .unwrap_or_else(|| p.owner_id.clone())
-        };
 
         let creator_user = sso_client.get_user(&p.owner_id).await;
 
@@ -110,7 +101,11 @@ async fn partial_home_matches(api_client: &State<ApiClient>) -> Result<Template,
         let team_b_name = api_client.get_cached_pilot_name(&m.team_b.aip_id.to_string()).await.unwrap_or(m.team_b.aip_id.to_string());
 
         let download_url = if let Some(replay_id) = m.replay_id {
-            Some(format!("{}/replay?replayId={}", api_client.base_url(), replay_id))
+            if replay_id.trim().len() == 0 {
+                None
+            } else {
+                Some(format!("{}/replay?replayId={}", api_client.base_url(), replay_id))
+            }
         } else {
             None
         };
@@ -265,6 +260,143 @@ async fn match_create_page(user: ApiUser) -> Result<Template, ApiErrors> {
     Ok(Template::render(
         "match_create",
         context! {
+            user: user,
+            build_info: build_info_ctx()
+        },
+    ))
+}
+
+#[get("/match/<match_id>")]
+async fn match_page(
+    user: Option<ApiUser>,
+    match_id: &str,
+    api_client: &State<ApiClient>,
+) -> Result<Template, ApiErrors> {
+    let match_result = api_client
+        .get_match(match_id)
+        .await
+        .ok_or_else(|| ApiErrors::NotFound("Match not found".into()))?;
+
+    let team_a_id = match_result.team_a.aip_id.to_string();
+    let team_b_id = match_result.team_b.aip_id.to_string();
+
+    let (team_a_name, team_b_name) = join!(
+        api_client.get_cached_pilot_name(&team_a_id),
+        api_client.get_cached_pilot_name(&team_b_id)
+    );
+
+    let team_a_name = team_a_name.unwrap_or("Unknown".to_string());
+    let team_b_name = team_b_name.unwrap_or("Unknown".to_string());
+
+    // Build the download URL from replay_id if available
+    let download_url = match_result
+        .replay_id
+        .filter(|r| r.trim().len() > 0)
+        .as_ref()
+        .map(|replay_id| format!("{}/replay?replayId={}", api_client.base_url(), replay_id));
+
+    // URL encode the download URL for the iframe using percent encoding
+    let url_encoded_download_url = download_url.as_ref().map(|url| {
+        url.chars()
+            .map(|c| match c {
+                'A'..='Z' | 'a'..='z' | '0'..='9' | '-' | '_' | '.' | '~' => c.to_string(),
+                _ => format!("%{:02X}", c as u8),
+            })
+            .collect::<String>()
+    });
+
+    // Format the timestamp
+    let created_at = chrono::DateTime::from_timestamp(match_result.created_at / 1000, 0)
+        .map(|dt| dt.format("%Y-%m-%d %H:%M UTC").to_string())
+        .unwrap_or_else(|| "Unknown".to_string());
+
+    // Create enhanced match data with winner flags
+    let match_result = context! {
+        id: match_result.id.to_string(),
+        team_a: context! {
+            aip_name: team_a_name,
+            version: match_result.team_a.version,
+            winner: match_result.winner == Winner::TeamA
+        },
+        team_b: context! {
+            aip_name: team_b_name,
+            version: match_result.team_b.version,
+            winner: match_result.winner == Winner::TeamB
+        },
+        is_manual: match_result.manual_run,
+        created_at: created_at,
+        download_url: download_url
+    };
+
+    Ok(Template::render(
+        "match",
+        context! {
+            user: user,
+            build_info: build_info_ctx(),
+            match_result,
+            url_encoded_download_url: url_encoded_download_url
+        },
+    ))
+}
+
+#[get("/matches")]
+async fn matches_page(user: Option<ApiUser>, api_client: &State<ApiClient>) -> Result<Template, ApiErrors> {
+    let mut matches = api_client.get_matches(None, None).await;
+
+    // Sort matches by created_at descending (newest first)
+    matches.sort_by(|a, b| b.created_at.cmp(&a.created_at));
+
+    // Process matches into context objects with detailed info
+    let matches_ctx: Vec<_> = join_all(matches.into_iter().map(async |m| {
+        let team_a_name = api_client.get_cached_pilot_name(&m.team_a.aip_id.to_string()).await.unwrap_or(m.team_a.aip_id.to_string());
+        let team_b_name = api_client.get_cached_pilot_name(&m.team_b.aip_id.to_string()).await.unwrap_or(m.team_b.aip_id.to_string());
+
+        let download_url = if let Some(replay_id) = m.replay_id {
+            if replay_id.trim().len() == 0 {
+                None
+            } else {
+                Some(format!("{}/replay?replayId={}", api_client.base_url(), replay_id))
+            }
+        } else {
+            None
+        };
+
+        context! {
+            id: m.id.to_string(),
+            created_at: format_date_time(&chrono::DateTime::<chrono::Utc>::from_timestamp(m.created_at / 1_000, 0).unwrap_or_default()),
+            created_at_timestamp: m.created_at,
+            is_manual: m.manual_run,
+            match_type: if m.manual_run { "Manual" } else { "Auto" },
+            team_a: context! { 
+                winner: m.winner == Winner::TeamA, 
+                aip_id: m.team_a.aip_id.to_string(), 
+                aip_name: team_a_name.clone(), 
+                version: m.team_a.version 
+            },
+            team_b: context! { 
+                winner: m.winner == Winner::TeamB, 
+                aip_id: m.team_b.aip_id.to_string(), 
+                aip_name: team_b_name.clone(), 
+                version: m.team_b.version 
+            },
+            winner_name: match m.winner {
+                Winner::TeamA => team_a_name,
+                Winner::TeamB => team_b_name,
+                Winner::Unknown => "Unknown".to_string(),
+            },
+            has_replay: download_url.is_some(),
+            download_url: download_url,
+        }
+    }))
+    .await;
+
+    let matches_count = matches_ctx.len();
+
+    Ok(Template::render(
+        "matches",
+        context! {
+            matches: matches_ctx,
+            matches_count: matches_count,
             user: user,
             build_info: build_info_ctx()
         },
@@ -503,10 +635,7 @@ async fn partial_pilot_version_stats(
         .ok_or_else(|| ApiErrors::NotFound("Pilot not found".into()))?;
 
     let all_matches = api_client
-        .get_matches(
-            Some(pilot.id.to_string().as_str()),
-            Some(version),
-        )
+        .get_matches(Some(pilot.id.to_string().as_str()), Some(version))
         .await;
 
     let version_matches: Vec<_> = all_matches
@@ -628,51 +757,75 @@ async fn users_page(
 ) -> Result<Template, ApiErrors> {
     // Get all pilots to extract unique owners
     let pilots = api_client.get_pilots().await;
-    
+
     // Create a map to collect user stats
-    let mut user_map: std::collections::HashMap<String, (String, Option<String>, Vec<String>, i32, f32)> = 
-        std::collections::HashMap::new(); // owner_id -> (username, avatar_url, pilot_names, total_matches, win_rate)
-    
+    let mut user_map: std::collections::HashMap<
+        String,
+        (String, Option<String>, Vec<String>, i32, f32),
+    > = std::collections::HashMap::new(); // owner_id -> (username, avatar_url, pilot_names, total_matches, win_rate)
+
     // Process each pilot to gather user information
     for pilot in &pilots {
         let owner_id = pilot.owner_id.clone();
         let pilot_name = pilot.name.clone();
-        
+
         // Get matches for this pilot to calculate stats
-        let matches = api_client.get_matches(Some(&pilot.id.to_string()), None).await;
+        let matches = api_client
+            .get_matches(Some(&pilot.id.to_string()), None)
+            .await;
         let pilot_total_matches = matches.len();
-        let pilot_wins = matches.iter().filter(|m| {
-            (m.team_a.aip_id == pilot.id && m.winner == Winner::TeamA) ||
-            (m.team_b.aip_id == pilot.id && m.winner == Winner::TeamB)
-        }).count();
-        
+        let pilot_wins = matches
+            .iter()
+            .filter(|m| {
+                (m.team_a.aip_id == pilot.id && m.winner == Winner::TeamA)
+                    || (m.team_b.aip_id == pilot.id && m.winner == Winner::TeamB)
+            })
+            .count();
+
         // Get username from Discord cache
         let user_info = sso_client.get_user(&owner_id).await;
-        let username = user_info.as_ref()
+        let username = user_info
+            .as_ref()
             .map(|u| u.username.clone())
             .unwrap_or_else(|| owner_id.clone());
-        let avatar_url = user_info.as_ref()
+        let avatar_url = user_info
+            .as_ref()
             .map(|info| discord_avatar_url(&owner_id, &info.avatar));
-        
+
         // Update or insert user stats
-        let entry = user_map.entry(owner_id.clone()).or_insert((username, avatar_url, Vec::new(), 0, 0.0));
+        let entry =
+            user_map
+                .entry(owner_id.clone())
+                .or_insert((username, avatar_url, Vec::new(), 0, 0.0));
         entry.2.push(pilot_name);
         entry.3 += pilot_total_matches as i32;
-        
+
         // Recalculate overall win rate (weighted average)
         if entry.3 > 0 {
-            let total_wins = (entry.4 / 100.0 * (entry.3 - pilot_total_matches as i32) as f32) + pilot_wins as f32;
+            let total_wins = (entry.4 / 100.0 * (entry.3 - pilot_total_matches as i32) as f32)
+                + pilot_wins as f32;
             entry.4 = total_wins / entry.3 as f32 * 100.0;
         }
     }
-    
+
     // Convert to vector with struct for easier sorting
-    let mut users: Vec<_> = user_map.into_iter()
-        .map(|(owner_id, (username, avatar_url, pilot_names, total_matches, win_rate))| {
-            (owner_id, username, avatar_url, pilot_names.len(), pilot_names, total_matches, win_rate)
-        })
+    let mut users: Vec<_> = user_map
+        .into_iter()
+        .map(
+            |(owner_id, (username, avatar_url, pilot_names, total_matches, win_rate))| {
+                (
+                    owner_id,
+                    username,
+                    avatar_url,
+                    pilot_names.len(),
+                    pilot_names,
+                    total_matches,
+                    win_rate,
+                )
+            },
+        )
         .collect();
-    
+
     // Sort by pilot count descending, then by total matches
     users.sort_by(|a, b| {
         let pilot_count_cmp = b.3.cmp(&a.3); // pilot count
@@ -682,22 +835,33 @@ async fn users_page(
             pilot_count_cmp
         }
     });
-    
+
     // Convert to context objects
-    let users_ctx: Vec<_> = users.into_iter()
-        .map(|(owner_id, username, avatar_url, pilot_count, pilot_names, total_matches, win_rate)| {
-            context! {
-                owner_id: owner_id,
-                username: username,
-                avatar_url: avatar_url,
-                pilot_count: pilot_count,
-                pilot_names: pilot_names,
-                total_matches: total_matches,
-                win_rate: format!("{:.1}", win_rate),
-            }
-        })
+    let users_ctx: Vec<_> = users
+        .into_iter()
+        .map(
+            |(
+                owner_id,
+                username,
+                avatar_url,
+                pilot_count,
+                pilot_names,
+                total_matches,
+                win_rate,
+            )| {
+                context! {
+                    owner_id: owner_id,
+                    username: username,
+                    avatar_url: avatar_url,
+                    pilot_count: pilot_count,
+                    pilot_names: pilot_names,
+                    total_matches: total_matches,
+                    win_rate: format!("{:.1}", win_rate),
+                }
+            },
+        )
         .collect();
-    
+
     Ok(Template::render(
         "users",
         context! {
@@ -717,74 +881,90 @@ async fn user_page(
 ) -> Result<Template, ApiErrors> {
     // Get all pilots for this user
     let all_pilots = api_client.get_pilots().await;
-    let user_pilots: Vec<_> = all_pilots.into_iter()
+    let user_pilots: Vec<_> = all_pilots
+        .into_iter()
         .filter(|p| p.owner_id == owner_id)
         .collect();
-    
+
     if user_pilots.is_empty() {
-        return Err(ApiErrors::NotFound("User not found or has no pilots".into()));
+        return Err(ApiErrors::NotFound(
+            "User not found or has no pilots".into(),
+        ));
     }
-    
+
     // Get user info from Discord cache
     let user_info = sso_client.get_user(owner_id).await;
-    let username = user_info.as_ref()
+    let username = user_info
+        .as_ref()
         .map(|info| info.username.clone())
         .unwrap_or_else(|| owner_id.to_string());
-    let user_avatar = user_info.as_ref()
+    let user_avatar = user_info
+        .as_ref()
         .map(|info| discord_avatar_url(owner_id, &info.avatar));
-    
+
     // Gather all matches for user's pilots
     let mut all_matches = Vec::new();
     let mut pilot_stats = Vec::new();
-    
+
     for pilot in &user_pilots {
-        let matches = api_client.get_matches(Some(&pilot.id.to_string()), None).await;
+        let matches = api_client
+            .get_matches(Some(&pilot.id.to_string()), None)
+            .await;
         all_matches.extend(matches.clone());
-        
+
         // Calculate stats for this pilot
         let total_matches = matches.len();
-        let wins = matches.iter().filter(|m| {
-            (m.team_a.aip_id == pilot.id && m.winner == Winner::TeamA) ||
-            (m.team_b.aip_id == pilot.id && m.winner == Winner::TeamB)
-        }).count();
+        let wins = matches
+            .iter()
+            .filter(|m| {
+                (m.team_a.aip_id == pilot.id && m.winner == Winner::TeamA)
+                    || (m.team_b.aip_id == pilot.id && m.winner == Winner::TeamB)
+            })
+            .count();
         let losses = total_matches - wins;
         let win_rate = if total_matches > 0 {
             wins as f32 / total_matches as f32 * 100.0
         } else {
             0.0
         };
-        
-        pilot_stats.push((context! {
-            name: pilot.name.clone(),
-            current_version: pilot.current.version,
-            total_matches: total_matches,
-            wins: wins,
-            losses: losses,
-            win_rate: format!("{:.1}", win_rate),
-        }, total_matches));
+
+        pilot_stats.push((
+            context! {
+                name: pilot.name.clone(),
+                current_version: pilot.current.version,
+                total_matches: total_matches,
+                wins: wins,
+                losses: losses,
+                win_rate: format!("{:.1}", win_rate),
+            },
+            total_matches,
+        ));
     }
-    
+
     // Sort pilots by total matches descending
     pilot_stats.sort_by(|a, b| b.1.cmp(&a.1));
-    
+
     // Convert to context objects
     let pilot_stats: Vec<_> = pilot_stats.into_iter().map(|(ctx, _)| ctx).collect();
-    
+
     // Calculate overall user stats
     let total_matches = all_matches.len();
-    let total_wins = all_matches.iter().filter(|m| {
-        user_pilots.iter().any(|pilot| {
-            (m.team_a.aip_id == pilot.id && m.winner == Winner::TeamA) ||
-            (m.team_b.aip_id == pilot.id && m.winner == Winner::TeamB)
+    let total_wins = all_matches
+        .iter()
+        .filter(|m| {
+            user_pilots.iter().any(|pilot| {
+                (m.team_a.aip_id == pilot.id && m.winner == Winner::TeamA)
+                    || (m.team_b.aip_id == pilot.id && m.winner == Winner::TeamB)
+            })
         })
-    }).count();
+        .count();
     let total_losses = total_matches - total_wins;
     let overall_win_rate = if total_matches > 0 {
         total_wins as f32 / total_matches as f32 * 100.0
     } else {
         0.0
     };
-    
+
     // Get recent matches (last 20, sorted by date)
     let mut sorted_matches = all_matches.clone();
     sorted_matches.sort_by(|a, b| b.created_at.cmp(&a.created_at));
@@ -793,7 +973,6 @@ async fn user_page(
         let user_pilot = user_pilots.iter().find(|pilot| {
             m.team_a.aip_id == pilot.id || m.team_b.aip_id == pilot.id
         }).unwrap();
-        
         let (opponent_id, opponent_version, pilot_version, won) = if m.team_a.aip_id == user_pilot.id {
             (m.team_b.aip_id, m.team_b.version, m.team_a.version, m.winner == Winner::TeamA)
         } else {
@@ -803,7 +982,6 @@ async fn user_page(
         let opponent_name = api_client.get_cached_pilot_name(&opponent_id.to_string())
             .await
             .unwrap_or(opponent_id.to_string());
-        
         context! {
             pilot_name: user_pilot.name.clone(),
             pilot_version: pilot_version,
@@ -814,7 +992,7 @@ async fn user_page(
             is_manual: m.manual_run,
         }
     })).await;
-    
+
     Ok(Template::render(
         "user",
         context! {
@@ -923,6 +1101,8 @@ async fn rocket() -> _ {
                 user_tokens_page,
                 upload_page,
                 match_create_page,
+                match_page,
+                matches_page,
                 pilot_stats_page,
                 partial_pilot_version_stats,
                 users_page,

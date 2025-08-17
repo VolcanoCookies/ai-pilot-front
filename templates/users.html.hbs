@@ -189,105 +189,6 @@ document.addEventListener('DOMContentLoaded', () => {
   margin-top: 10px;
 }
 
-/* Custom Dropdown Styling */
-.sort-dropdown {
-  position: relative;
-  display: inline-block;
-}
-
-.sort-button {
-  appearance: none;
-  border: 1px solid var(--border);
-  background: var(--surface);
-  color: var(--text);
-  padding: 8px 16px;
-  border-radius: var(--radius-md);
-  font-weight: 500;
-  font-size: 14px;
-  line-height: 1.4;
-  white-space: nowrap;
-  transition: all 0.15s ease;
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  min-width: 160px;
-  justify-content: space-between;
-}
-
-.sort-button:hover {
-  background: var(--surface-hover);
-  border-color: var(--accent-muted);
-  transform: translateY(-1px);
-  box-shadow: var(--shadow-md);
-}
-
-.sort-button.active {
-  border-color: var(--accent-muted);
-  background: var(--surface-hover);
-}
-
-.sort-arrow {
-  transition: transform 0.2s ease;
-  font-size: 18px;
-  color: var(--text-muted);
-}
-
-.sort-menu {
-  position: fixed;
-  z-index: 1000;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  box-shadow: var(--shadow-lg);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  overflow: hidden;
-  transition: all 0.2s ease;
-  opacity: 0;
-  transform: translateY(-8px) scale(0.95);
-}
-
-.sort-menu.visible {
-  opacity: 1;
-  transform: translateY(0) scale(1);
-}
-
-.sort-menu.hidden {
-  opacity: 0;
-  transform: translateY(-8px) scale(0.95);
-  pointer-events: none;
-}
-
-.sort-option {
-  padding: 6px 16px;
-  color: var(--text);
-  cursor: pointer;
-  font-size: 14px;
-  font-weight: 500;
-  transition: all 0.15s ease;
-  border-bottom: 1px solid var(--border-muted);
-}
-
-.sort-option:last-child {
-  border-bottom: none;
-}
-
-.sort-option:hover {
-  background: var(--surface-hover);
-  color: var(--accent-hover);
-}
-
-.sort-option.active {
-  background: var(--accent-muted);
-  color: var(--accent-hover);
-}
-
-.sort-option.active:hover {
-  background: var(--accent);
-  color: #ffffff;
-}
-
 /* Header Glyph */
 .user-header-glyph {
   background: var(--accent-muted);
@@ -366,19 +267,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
 /* Responsive Design */
 @media (max-width: 768px) {
-  .sort-button {
-    min-width: 140px;
-    font-size: 13px;
-    padding: 6px 12px;
-  }
-  
-  .sort-menu {
-    position: fixed;
-    left: 16px !important;
-    right: 16px;
-    min-width: auto !important;
-  }
-  
   .user-avatar {
     width: 28px;
     height: 28px;

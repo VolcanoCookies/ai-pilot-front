@@ -1,0 +1,224 @@
+{{#> layouts/main title="Match Replay"}}
+
+<div class="container">
+  <!-- Match Header -->
+  <section class="stats-header">
+    <div class="stats-header-main">
+      <h1 class="stats-title">Match Replay</h1>
+      <div class="stats-meta">
+        {{#if match_result.team_a}}
+          <span class="match-teams">
+            <span class="team {{#if match_result.team_a.winner}}match-winner{{else}}match-loser{{/if}}">
+              {{match_result.team_a.aip_name}} v{{match_result.team_a.version}}
+            </span>
+            <span class="vs-text">vs</span>
+            <span class="team {{#if match_result.team_b.winner}}match-winner{{else}}match-loser{{/if}}">
+              {{match_result.team_b.aip_name}} v{{match_result.team_b.version}}
+            </span>
+          </span>
+          <span class="pilot-separator">•</span>
+          <span class="match-type {{#if match_result.is_manual}}manual-match{{else}}auto-match{{/if}}">{{#if match_result.is_manual}}Manual{{else}}Auto{{/if}}</span>
+          <span class="pilot-separator">•</span>
+          <span class="match-timestamp">{{match_result.created_at}}</span>
+        {{/if}}
+      </div>
+    </div>
+    <div class="stats-header-actions">
+      <a href="/" class="btn ghost">← Back to Home</a>
+      {{#if match_result.download_url}}
+        <a href="https://vtolvr.live/replay?url={{url_encoded_download_url}}" target="_blank" class="btn secondary">
+          <span class="material-symbols-rounded">open_in_new</span>
+          Open in vtolvr.live
+        </a>
+        <a href="{{match_result.download_url}}" download class="btn primary">
+          <span class="material-symbols-rounded">download</span>
+          Download Replay
+        </a>
+      {{/if}}
+    </div>
+  </section>
+
+  <!-- Replay Viewer -->
+  <div class="replay-container glass">
+    {{#if match_result.download_url}}
+      <iframe 
+        id="replay-iframe"
+        src="https://vtolvr.live/replay?url={{url_encoded_download_url}}"
+        class="replay-iframe"
+        frameborder="0"
+        allowfullscreen>
+      </iframe>
+      <div class="replay-loading" id="replay-loading">
+        <div class="spinner"></div>
+        <span>Loading replay viewer...</span>
+      </div>
+    {{else}}
+      <div class="replay-unavailable">
+        <span class="material-symbols-rounded">file_download_off</span>
+        <h3>Replay Unavailable</h3>
+        <p>This match replay is not available for viewing.</p>
+      </div>
+    {{/if}}
+  </div>
+</div>
+
+<script>
+(function() {
+  const iframe = document.getElementById('replay-iframe');
+  const loading = document.getElementById('replay-loading');
+  
+  if (iframe && loading) {
+    iframe.addEventListener('load', function() {
+      loading.style.display = 'none';
+    });
+    
+    // Hide loading after 10 seconds even if iframe doesn't load
+    setTimeout(function() {
+      if (loading) {
+        loading.style.display = 'none';
+      }
+    }, 10000);
+  }
+})();
+</script>
+
+<style>
+.match-teams {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.team {
+  font-weight: 500;
+}
+
+.vs-text {
+  color: var(--text-muted);
+  font-weight: normal;
+  font-size: 0.9em;
+}
+
+.match-timestamp {
+  color: var(--text-muted);
+}
+
+.replay-container {
+  position: relative;
+  width: 100%;
+  height: 80vh;
+  min-height: 600px;
+  overflow: hidden;
+  border-radius: var(--radius-lg);
+}
+
+.replay-iframe {
+  width: 100%;
+  height: 100%;
+  border: none;
+  border-radius: var(--radius-lg);
+}
+
+.replay-loading {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: var(--surface);
+  border-radius: var(--radius-lg);
+  gap: 16px;
+}
+
+.replay-loading .spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid var(--border);
+  border-top: 3px solid var(--accent);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.replay-loading span {
+  color: var(--text-muted);
+  font-size: 14px;
+}
+
+.replay-unavailable {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: var(--surface);
+  border-radius: var(--radius-lg);
+  gap: 16px;
+  text-align: center;
+}
+
+.replay-unavailable .material-symbols-rounded {
+  font-size: 48px;
+  color: var(--text-muted);
+  opacity: 0.6;
+}
+
+.replay-unavailable h3 {
+  margin: 0;
+  color: var(--text);
+  font-size: 20px;
+  font-weight: 600;
+}
+
+.replay-unavailable p {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 14px;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+  .replay-container {
+    height: 70vh;
+    min-height: 400px;
+  }
+  
+  .match-teams {
+    flex-direction: column;
+    gap: 8px;
+    align-items: flex-start;
+  }
+  
+  .stats-header-actions {
+    flex-direction: column;
+    gap: 8px;
+  }
+  
+  .stats-header-actions .btn {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
+/* Dark theme adjustments */
+@media (prefers-color-scheme: dark) {
+  .replay-iframe {
+    filter: brightness(0.9);
+  }
+}
+</style>
+
+{{/layouts/main}}

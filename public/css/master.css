@@ -832,14 +832,6 @@ th {
   flex-shrink: 0;
 }
 
-.match-type {
-  font-size: 11px;
-  color: var(--text-muted);
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
 .match-timestamp {
   font-size: 12px;
   color: var(--text-muted);
@@ -869,10 +861,6 @@ th {
     font-size: 11px;
   }
 }
-
-/* Match winner/loser styling */
-.match-winner { color: var(--success); }
-.match-loser { color: var(--text-muted); }
 
 /* Pilot listing styling */
 .pilot-creator {
@@ -1165,4 +1153,304 @@ th {
 .version-row.selected .stat-losses {
   color: #ffffff;
   opacity: 0.9;
+}
+
+/* ===== COMMON DROPDOWN STYLING ===== */
+/* Shared dropdown component styles used across multiple pages */
+
+.dropdown-container {
+  position: relative;
+  display: inline-block;
+}
+
+/* Base dropdown button styling (used for sort-button, filter-button, etc.) */
+.dropdown-button {
+  appearance: none;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  padding: 8px 12px 8px 16px;
+  border-radius: var(--radius-md);
+  font-weight: 500;
+  font-size: 14px;
+  line-height: 1.4;
+  white-space: nowrap;
+  transition: all 0.15s ease;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 140px;
+  justify-content: space-between;
+}
+
+.dropdown-button:hover {
+  background: var(--surface-hover);
+  border-color: var(--accent-muted);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-md);
+}
+
+.dropdown-button.active {
+  border-color: var(--accent-muted);
+  background: var(--surface-hover);
+}
+
+.dropdown-arrow {
+  transition: transform 0.2s ease;
+  font-size: 16px;
+  color: var(--text-muted);
+}
+
+.dropdown-menu {
+  position: fixed;
+  z-index: 1000;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  overflow: hidden;
+  transition: all 0.2s ease;
+  opacity: 0;
+  transform: translateY(-8px) scale(0.95);
+}
+
+.dropdown-menu.visible {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+}
+
+.dropdown-menu.hidden {
+  opacity: 0;
+  transform: translateY(-8px) scale(0.95);
+  pointer-events: none;
+}
+
+.dropdown-option {
+  padding: 6px 16px;
+  color: var(--text);
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  transition: all 0.15s ease;
+  border-bottom: 1px solid var(--border-muted);
+}
+
+.dropdown-option:last-child {
+  border-bottom: none;
+}
+
+.dropdown-option:hover {
+  background: var(--surface-hover);
+  color: var(--accent-hover);
+}
+
+.dropdown-option.active {
+  background: var(--accent-muted);
+  color: var(--accent-hover);
+}
+
+.dropdown-option.active:hover {
+  background: var(--accent);
+  color: #ffffff;
+}
+
+/* Legacy class aliases for backward compatibility */
+.sort-dropdown, .filter-dropdown {
+  position: relative;
+  display: inline-block;
+}
+
+.sort-button, .filter-button {
+  appearance: none;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  padding: 8px 12px 8px 16px;
+  border-radius: var(--radius-md);
+  font-weight: 500;
+  font-size: 14px;
+  line-height: 1.4;
+  white-space: nowrap;
+  transition: all 0.15s ease;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 140px;
+  justify-content: space-between;
+}
+
+.sort-button {
+  min-width: 160px;
+}
+
+.sort-button:hover, .filter-button:hover {
+  background: var(--surface-hover);
+  border-color: var(--accent-muted);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-md);
+}
+
+.sort-button.active, .filter-button.active {
+  border-color: var(--accent-muted);
+  background: var(--surface-hover);
+}
+
+.sort-arrow, .filter-arrow {
+  transition: transform 0.2s ease;
+  font-size: 18px !important;
+  color: var(--text-muted);
+}
+
+.sort-menu, .filter-menu {
+  position: fixed;
+  z-index: 1000;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  overflow: hidden;
+  transition: all 0.2s ease;
+  opacity: 0;
+  transform: translateY(-8px) scale(0.95);
+}
+
+.sort-menu.visible, .filter-menu.visible {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+}
+
+.sort-menu.hidden, .filter-menu.hidden {
+  opacity: 0;
+  transform: translateY(-8px) scale(0.95);
+  pointer-events: none;
+}
+
+.sort-option, .filter-option {
+  padding: 6px 16px;
+  color: var(--text);
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  transition: all 0.15s ease;
+  border-bottom: 1px solid var(--border-muted);
+}
+
+.sort-option:last-child, .filter-option:last-child {
+  border-bottom: none;
+}
+
+.sort-option:hover, .filter-option:hover {
+  background: var(--surface-hover);
+  color: var(--accent-hover);
+}
+
+.sort-option.active, .filter-option.active {
+  background: var(--accent-muted);
+  color: var(--accent-hover);
+}
+
+.sort-option.active:hover, .filter-option.active:hover {
+  background: var(--accent);
+  color: #ffffff;
+}
+
+/* Responsive design for dropdowns */
+@media (max-width: 768px) {
+  .sort-button, .filter-button {
+    min-width: 120px;
+    font-size: 13px;
+    padding: 6px 10px 6px 12px;
+  }
+  
+  .sort-menu, .filter-menu {
+    position: fixed;
+    left: 16px !important;
+    right: 16px;
+    min-width: auto !important;
+  }
+}
+
+/* Match Type Chip Styling */
+.match-type {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+  font-weight: 500;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  background: var(--surface-accent);
+  border: 1px solid var(--border-muted);
+}
+
+.manual-match {
+  background: rgba(59, 130, 246, 0.1);
+  color: rgb(59, 130, 246);
+  border-color: rgba(59, 130, 246, 0.2);
+}
+
+.auto-match {
+  background: rgba(16, 185, 129, 0.1);
+  color: rgb(16, 185, 129);
+  border-color: rgba(16, 185, 129, 0.2);
+}
+
+/* Dark theme adjustments */
+@media (prefers-color-scheme: dark) {
+  .manual-match {
+    background: rgba(59, 130, 246, 0.15);
+    color: rgb(96, 165, 250);
+  }
+  
+  .auto-match {
+    background: rgba(16, 185, 129, 0.15);
+    color: rgb(52, 211, 153);
+  }
+}
+
+/* Subtle copy icon */
+.copy-value:hover {
+    opacity: 1 !important;
+}
+
+/* Code block styling for copyable values */
+code.copy-value {
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 4px;
+    padding: 2px 6px;
+    font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+    font-weight: 400;
+    transition: background 0.2s, border-color 0.2s;
+}
+
+code.copy-value:hover {
+    background: rgba(255, 255, 255, 0.12);
+    border-color: rgba(255, 255, 255, 0.2);
+}
+
+/* Download icon styling */
+.material-symbols-rounded[title*="Download"]:hover,
+a.material-symbols-rounded:hover {
+    color: var(--text) !important;
+}
+
+/* Disabled icon styling */
+.material-symbols-rounded[style*="--text-disabled"] {
+    --text-disabled: rgba(166, 179, 194, 0.4); /* Muted text with lower opacity */
+}
+
+/* Match result colors - pastel green for winner, pastel red for loser */
+.match-winner {
+    color: #81c784; /* Pastel green */
+}
+
+.match-loser {
+    color: #e57373; /* Pastel red */
 }
