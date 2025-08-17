@@ -22,7 +22,7 @@ steps:
         - latest
       build_args_from_env:
         - DRONE_COMMIT
-        - DRONE_BUILD_START
+        - DRONE_BUILD_STARTED
       username: VolcanoCookies
       password:
         from_secret: github-token
