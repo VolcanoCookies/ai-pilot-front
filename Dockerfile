@@ -1,6 +1,9 @@
 FROM rust:1.89 AS builder
 WORKDIR /app
 
+ARG DRONE_COMMIT
+ARG DRONE_BUILD_STARTED
+
 COPY . .
 RUN cargo build --release
 
