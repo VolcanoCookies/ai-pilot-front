@@ -20,6 +20,9 @@ steps:
       registry: ghcr.io
       tags:
         - latest
+      build_args_from_env:
+        - DRONE_COMMIT
+        - DRONE_BUILD_START
       username: VolcanoCookies
       password:
         from_secret: github-token
