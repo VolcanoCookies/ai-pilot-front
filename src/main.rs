@@ -218,7 +218,7 @@ async fn user_tokens_page(
                 created_at: format_date_time(&t.created_at),
                 expires_at: t.expires_at.map(|d| format_date_time(&d)),
             }).collect::<Vec<_>>(),
-            user: u.as_ref().map(|u| context!{ id: u.id, username: u.username.clone(), avatar_url: discord_avatar_url(&u.discord_id, &u.avatar_url) }),
+            user: u,
             build_info: build_info_ctx()
         },
     ))
