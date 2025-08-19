@@ -136,7 +136,7 @@
                  data-has-replay="{{this.has_replay}}"
                  data-created-at="{{this.created_at}}"
                  data-created-at-timestamp="{{this.created_at_timestamp}}">
-              <div class="glyph {{#if this.has_replay}}has-replay{{else}}no-replay{{/if}}"></div>
+              <div class="glyph no-replay"></div>
               <div class="row-main">
                 <div class="row-title match-teams-with-info">
                   <div class="match-teams">
@@ -244,6 +244,8 @@ function initializeMatches() {
     matchesContainer.style.display = 'block'; // Keep original "no matches" message visible
     if (noResults) noResults.style.display = 'none';
   }
+
+  filterAndRender();
 }
 
 // Initialize when DOM is ready
