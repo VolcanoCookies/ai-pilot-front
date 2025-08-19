@@ -26,3 +26,9 @@ steps:
       username: VolcanoCookies
       password:
         from_secret: github-token
+
+  - name: deploy
+    image: bitnami/kubectl:1.33
+    commands:
+      - kubectl -n ai-pilot-front rollout restart deploy/ai-pilot-front
+      - kubectl -n ai-pilot-front rollout status deploy/ai-pilot-front --timeout=2m
