@@ -44,37 +44,35 @@
             </div>
             <div class="panel-body panel-scroll">
                 {{#if tokens.0}}
-                                            {{#each tokens}}
-                                                <div class="row no-shift" style="align-items: flex-start; width: 100%;">
-                                        <div class="glyph purple"></div>
-                                        <div class="row-main" style="min-width: 0; width: 100%;">
-                                            <div class="row-title">{{this.name}}</div>
-                                            <div class="meta-inline">
-                                                <span>Created: {{this.created_at}}</span>
-                                                <span class="dot">•</span>
-                                                <span>
-                                                    Expires: 
-                                                    {{#if this.expires_at}}
-                                                        <span class="{{#if this.is_expired}}expires-expired{{/if}}">{{this.expires_at}}</span>
-                                                    {{else}}
-                                                        <span class="expires-never">Never</span>
-                                                    {{/if}}
-                                                </span>
-                                            </div>
-                                            <div class="spacer" style="height:8px;"></div>
-                                                            <div class="token-chip" data-token="{{this.token}}" title="Click to copy">
-                                                                <span class="token-chip-text">{{this.token}}</span>
-                                                                <div class="token-copied">Copied</div>
-                                                            </div>
-                                        </div>
-                                        <div class="row-spacer"></div>
-                                        <div class="row-actions" style="align-items:flex-start;">
-                                            <button class="btn danger" onclick="deleteToken('{{this.id}}', '{{this.name}}')">Delete</button>
-                                        </div>
-                                    </div>
-                                {{/each}}
-                        {{else}}
-                            <div class="card glass center no-hover">
+                    {{#each tokens}}
+                                    <div class="row no-shift" style="align-items: flex-start; width: 100%;">
+                            <div class="glyph purple"></div>
+                            <div class="row-main" style="min-width: 0; width: 100%;">
+                                <div class="row-title">{{this.name}}</div>
+                                <div class="meta-inline">
+                                    <span>Created: {{this.created_at}}</span>
+                                    <span class="dot">•</span>
+                                    <span>
+                                        Expires: 
+                                        {{#if this.expires_at}}
+                                            <span class="{{#if this.is_expired}}expires-expired{{/if}}">{{this.expires_at}}</span>
+                                        {{else}}
+                                            <span class="expires-never">Never</span>
+                                        {{/if}}
+                                    </span>
+                                </div>
+                                <div class="token-chip" data-token="{{this.token}}" title="Click to copy">
+                                    <span class="token-chip-text">{{this.token}}</span>
+                                    <div class="token-copied">Copied</div>
+                                </div>
+                            </div>
+                            <div class="row-actions" style="align-items:flex-start;">
+                                <button class="btn danger" onclick="deleteToken('{{this.id}}', '{{this.name}}')">Delete</button>
+                            </div>
+                        </div>
+                    {{/each}}
+                {{else}}
+                    <div class="card glass center no-hover">
                         <div class="card-title">No tokens</div>
                         <p class="muted">Create your first token to see it here.</p>
                     </div>
@@ -171,5 +169,19 @@
                 });
         });
 </script>
+
+<style>
+/* Make container padding consistent on all sides */
+.container {
+  padding: 24px;
+}
+
+/* Responsive - use same padding on all sides for mobile too */
+@media (max-width: 768px) {
+  .container {
+    padding: 20px;
+  }
+}
+</style>
 
 {{/layouts/main}}
