@@ -206,8 +206,6 @@ async fn user_tokens_page(
         .await
         .map_err(|_| ApiErrors::InternalError("Failed to fetch user tokens".into()))?;
 
-    let u = crate::model::User::get_by_id(user.id, client).await.ok();
-
     Ok(Template::render(
         "user_tokens",
         context! {
@@ -218,7 +216,7 @@ async fn user_tokens_page(
                 created_at: format_date_time(&t.created_at),
                 expires_at: t.expires_at.map(|d| format_date_time(&d)),
             }).collect::<Vec<_>>(),
-            user: u,
+            user: user,
             build_info: build_info_ctx()
         },
     ))
